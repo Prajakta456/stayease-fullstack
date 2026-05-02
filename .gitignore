@@ -1,0 +1,29 @@
+# ========================
+# Root .gitignore
+# ========================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Environment files (never commit secrets)
+.env
+*.env
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Claude Cowork internal
+.sixth/
