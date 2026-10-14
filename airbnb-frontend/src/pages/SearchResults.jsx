@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { searchHotels } from '../services/api';
+import { searchHotels, getErrorMessage } from '../services/api';
+import { todayISO, addDaysISO, nightsBetween, formatDate, formatINR } from '../utils/format';
+
+const PAGE_SIZE = 9;
 
 function HotelCard({ hotel, price, onClick }) {
   const amenities = hotel.amenities || [];
@@ -15,7 +18,7 @@ function HotelCard({ hotel, price, onClick }) {
         )}
         {price != null && (
           <div className="hotel-card-price-badge">
-            ₹{price.toLocaleString('en-IN')}
+            {formatINR(price)}
           </div>
         )}
       </div>
@@ -34,8 +37,9 @@ function HotelCard({ hotel, price, onClick }) {
           <div>
             {price != null && (
               <div>
+                <span style={{ color: 'var(--ink-mid)', fontSize: '0.8rem' }}>from </span>
                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.3rem' }}>
-                  ₹{price.toLocaleString('en-IN')}
+                  {formatINR(price)}
                 </span>
                 <span style={{ color: 'var(--ink-mid)', fontSize: '0.8rem' }}> / night</span>
               </div>
@@ -56,55 +60,68 @@ export default function SearchResults() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [totalPages, setTotalPages] = useState(0);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
+  // The URL is the single source of truth, so refresh, back/forward and shared links all work
   const city = params.get('city') || '';
-  const startDate = params.get('startDate') || '';
-  const endDate = params.get('endDate') || '';
-  const roomsCount = parseInt(params.get('roomsCount') || '1');
+  const startDate = params.get('startDate') || todayISO();
+  const endDate = params.get('endDate') || addDaysISO(startDate, 1);
+  const roomsCount = parseInt(params.get('roomsCount') || '1', 10);
+  const currentPage = Math.max(0, parseInt(params.get('page') || '0', 10) || 0);
+  const nights = nightsBetween(startDate, endDate);
 
   const [filters, setFilters] = useState({ city, startDate, endDate, roomsCount });
 
+  // Keep the filter inputs in sync when the URL changes (back/forward, popular-city links)
   useEffect(() => {
-    doSearch(0);
-    // eslint-disable-next-line
-  }, [params]);
+    setFilters({ city, startDate, endDate, roomsCount });
+  }, [city, startDate, endDate, roomsCount]);
 
-  const doSearch = async (page = 0) => {
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    try {
-      const data = await searchHotels({
-        city: params.get('city') || '',
-        startDate: params.get('startDate'),
-        endDate: params.get('endDate'),
-        roomsCount: parseInt(params.get('roomsCount') || '1'),
-        page,
-        size: 9,
+    searchHotels({ city, startDate, endDate, roomsCount, page: currentPage, size: PAGE_SIZE })
+      .then(data => {
+        if (cancelled) return;
+        setResults(data.content || []);
+        setTotalPages(data.totalPages || 0);
+        setTotalElements(data.totalElements || 0);
+      })
+      .catch(e => {
+        if (!cancelled) setError(getErrorMessage(e, 'Could not load results. Please try again.'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
-      setResults(data.content || []);
-      setTotalPages(data.totalPages || 0);
-      setCurrentPage(page);
-    } catch (e) {
-      setError('Could not load results. Make sure the backend is running.');
-    } finally {
-      setLoading(false);
-    }
+    return () => { cancelled = true; };
+  }, [city, startDate, endDate, roomsCount, currentPage]);
+
+  const updateParams = (next) => {
+    setParams({
+      city: next.city,
+      startDate: next.startDate,
+      endDate: next.endDate,
+      roomsCount: next.roomsCount,
+      ...(next.page ? { page: next.page } : {}),
+    });
   };
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-    setParams({
-      city: filters.city,
-      startDate: filters.startDate,
-      endDate: filters.endDate,
-      roomsCount: filters.roomsCount,
-    });
+    updateParams({ ...filters, page: 0 });
   };
 
-  const nights = startDate && endDate
-    ? Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / 86400000))
-    : 1;
+  const goToPage = (page) => {
+    updateParams({ city, startDate, endDate, roomsCount, page });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFilterCheckIn = (value) => setFilters(p => ({
+    ...p,
+    startDate: value,
+    endDate: value && nightsBetween(value, p.endDate) === 0 ? addDaysISO(value, 1) : p.endDate,
+  }));
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ash)' }}>
@@ -113,10 +130,10 @@ export default function SearchResults() {
         <div className="container">
           <form className="flex items-center gap-4" onSubmit={handleFilterSubmit} style={{ flexWrap: 'wrap' }}>
             <div className="form-group" style={{ flex: '1 1 160px' }}>
-              <label className="form-label">City</label>
+              <label className="form-label">City or hotel</label>
               <input
                 className="form-input"
-                placeholder="Any city"
+                placeholder="Anywhere"
                 value={filters.city}
                 onChange={e => setFilters(p => ({ ...p, city: e.target.value }))}
               />
@@ -127,7 +144,9 @@ export default function SearchResults() {
                 className="form-input"
                 type="date"
                 value={filters.startDate}
-                onChange={e => setFilters(p => ({ ...p, startDate: e.target.value }))}
+                min={todayISO()}
+                required
+                onChange={e => handleFilterCheckIn(e.target.value)}
               />
             </div>
             <div className="form-group" style={{ flex: '1 1 140px' }}>
@@ -136,6 +155,8 @@ export default function SearchResults() {
                 className="form-input"
                 type="date"
                 value={filters.endDate}
+                min={addDaysISO(filters.startDate || todayISO(), 1)}
+                required
                 onChange={e => setFilters(p => ({ ...p, endDate: e.target.value }))}
               />
             </div>
@@ -160,17 +181,15 @@ export default function SearchResults() {
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
           <h1 className="page-title">
-            {city ? `Hotels in ${city}` : 'All Hotels'}
+            {city ? `Stays matching “${city}”` : 'All Hotels'}
           </h1>
-          {startDate && endDate && (
-            <p className="page-subtitle">
-              {new Date(startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-              {' → '}
-              {new Date(endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-              {' · '}{nights} night{nights > 1 ? 's' : ''}
-              {' · '}{roomsCount} room{roomsCount > 1 ? 's' : ''}
-            </p>
-          )}
+          <p className="page-subtitle">
+            {formatDate(startDate, { day: 'numeric', month: 'short' })}
+            {' → '}
+            {formatDate(endDate, { day: 'numeric', month: 'short' })}
+            {' · '}{nights} night{nights === 1 ? '' : 's'}
+            {' · '}{roomsCount} room{roomsCount > 1 ? 's' : ''}
+          </p>
         </div>
 
         {loading && (
@@ -196,19 +215,19 @@ export default function SearchResults() {
           </div>
         )}
 
-        {!loading && results.length > 0 && (
+        {!loading && !error && results.length > 0 && (
           <>
             <p style={{ color: 'var(--ink-mid)', marginBottom: 20, fontSize: '0.88rem' }}>
-              {results.length} propert{results.length === 1 ? 'y' : 'ies'} found
+              {totalElements} propert{totalElements === 1 ? 'y' : 'ies'} found
             </p>
             <div className="hotel-grid">
-              {results.map((item, i) => (
+              {results.map(item => (
                 <HotelCard
-                  key={item.hotel?.id ?? i}
-                  hotel={item.hotel || item}
+                  key={item.hotel.id}
+                  hotel={item.hotel}
                   price={item.price}
-                  onClick={() => navigate(`/hotels/${item.hotel?.id || item.id}`, {
-                    state: { startDate, endDate, roomsCount, nights }
+                  onClick={() => navigate(`/hotels/${item.hotel.id}`, {
+                    state: { startDate, endDate, roomsCount }
                   })}
                 />
               ))}
@@ -220,7 +239,7 @@ export default function SearchResults() {
                 <button
                   className="btn btn-outline"
                   disabled={currentPage === 0}
-                  onClick={() => doSearch(currentPage - 1)}
+                  onClick={() => goToPage(currentPage - 1)}
                 >
                   ← Previous
                 </button>
@@ -230,7 +249,7 @@ export default function SearchResults() {
                 <button
                   className="btn btn-outline"
                   disabled={currentPage >= totalPages - 1}
-                  onClick={() => doSearch(currentPage + 1)}
+                  onClick={() => goToPage(currentPage + 1)}
                 >
                   Next →
                 </button>

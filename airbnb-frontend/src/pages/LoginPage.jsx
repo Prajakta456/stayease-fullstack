@@ -1,14 +1,21 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { loginApi } from '../services/api';
+import { loginApi, getErrorMessage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+
+// Demo accounts only exist when the backend runs with SEED_DEMO_DATA=true. Shown by default in
+// development; a production build shows them only with REACT_APP_SHOW_DEMO_LOGINS=true (e.g. a demo site).
+const SHOW_DEMO_LOGINS = process.env.REACT_APP_SHOW_DEMO_LOGINS
+  ? process.env.REACT_APP_SHOW_DEMO_LOGINS === 'true'
+  : process.env.NODE_ENV === 'development';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
   const from = location.state?.from || '/';
+  const fromState = location.state?.fromState;
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -24,10 +31,9 @@ export default function LoginPage() {
       toast.success(`Welcome back, ${userData.name}!`);
       // Redirect based on role
       const isManager = userData.roles?.includes('HOTEL_MANAGER');
-      navigate(isManager ? '/admin' : from, { replace: true });
+      navigate(isManager && from === '/' ? '/admin' : from, { replace: true, state: fromState });
     } catch (err) {
-      const msg = err.response?.data?.error?.message || err.response?.data?.message || 'Invalid email or password';
-      toast.error(msg);
+      toast.error(getErrorMessage(err, 'Could not sign in. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -42,7 +48,7 @@ export default function LoginPage() {
         <h1 className="auth-title">Sign in to your account</h1>
         <p className="auth-subtitle">
           Don't have an account?{' '}
-          <Link to="/signup" className="auth-link">Create one free</Link>
+          <Link to="/signup" state={location.state} className="auth-link">Create one free</Link>
         </p>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -84,17 +90,21 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="auth-divider">
-          <span>Demo credentials</span>
-        </div>
-        <div className="auth-demo-creds">
-          <div>
-            <strong>Guest:</strong> guest@demo.com / password123
-          </div>
-          <div>
-            <strong>Manager:</strong> manager@demo.com / password123
-          </div>
-        </div>
+        {SHOW_DEMO_LOGINS && (
+          <>
+            <div className="auth-divider">
+              <span>Demo credentials</span>
+            </div>
+            <div className="auth-demo-creds">
+              <div>
+                <strong>Guest:</strong> guest@demo.com / password123
+              </div>
+              <div>
+                <strong>Manager:</strong> manager@demo.com / password123
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

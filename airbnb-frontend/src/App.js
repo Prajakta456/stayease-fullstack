@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -19,7 +19,7 @@ function NotFound() {
     <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
       <div style={{ fontSize: '5rem' }}>🏚️</div>
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem' }}>Page Not Found</h1>
-      <a href="/" className="btn btn-clay">Go Home</a>
+      <Link to="/" className="btn btn-clay">Go Home</Link>
     </div>
   );
 }
@@ -35,17 +35,10 @@ export default function App() {
           <Route path="/search" element={<SearchResults />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          {/* Browsing a hotel is public; reserving asks the visitor to sign in */}
+          <Route path="/hotels/:hotelId" element={<HotelDetail />} />
 
           {/* Guest-protected routes */}
-          <Route
-            path="/hotels/:hotelId"
-            element={
-              <ProtectedRoute requiredRole="GUEST">
-                <HotelDetail />
-              </ProtectedRoute>
-            }
-          />
-          {/* ✅ FIXED: /bookings route was linked in Navbar but missing from routes */}
           <Route
             path="/bookings"
             element={

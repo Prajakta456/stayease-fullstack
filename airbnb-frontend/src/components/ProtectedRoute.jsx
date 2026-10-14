@@ -8,7 +8,14 @@ export function ProtectedRoute({ children, requiredRole }) {
   if (loading) return <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>;
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    // Remember where the user was going (including query string and page state) for after sign-in
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname + location.search, fromState: location.state }}
+        replace
+      />
+    );
   }
 
   if (requiredRole && !user.roles?.includes(requiredRole)) {

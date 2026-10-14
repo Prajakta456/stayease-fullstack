@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getHotelById, getAllRooms, createRoom, deleteRoom } from '../services/api';
+import { getHotelById, getAllRooms, createRoom, deleteRoom, getErrorMessage } from '../services/api';
+import { formatINR } from '../utils/format';
 import toast from 'react-hot-toast';
 
 const EMPTY_ROOM = {
@@ -32,7 +33,7 @@ function RoomModal({ hotelId, onClose, onSaved }) {
       onSaved(saved);
       onClose();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to create room');
+      toast.error(getErrorMessage(e, 'Failed to create room'));
     } finally {
       setSaving(false);
     }
@@ -52,7 +53,7 @@ function RoomModal({ hotelId, onClose, onSaved }) {
                 <label className="form-label">Room Type *</label>
                 <input className="form-input" required value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} placeholder="Deluxe Suite, Standard Room, etc." />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div className="form-grid-3">
                 <div className="form-group">
                   <label className="form-label">Base Price (₹) *</label>
                   <input className="form-input" required type="number" min="0" value={form.basePrice} onChange={e => setForm(f => ({ ...f, basePrice: e.target.value }))} placeholder="2500" />
@@ -100,7 +101,7 @@ export default function RoomAdmin() {
   useEffect(() => {
     Promise.all([getHotelById(hotelId), getAllRooms(hotelId)])
       .then(([h, r]) => { setHotel(h); setRooms(r || []); })
-      .catch(() => toast.error('Could not load rooms'))
+      .catch(e => toast.error(getErrorMessage(e, 'Could not load rooms')))
       .finally(() => setLoading(false));
   }, [hotelId]);
 
@@ -111,8 +112,8 @@ export default function RoomAdmin() {
       await deleteRoom(hotelId, roomId);
       setRooms(prev => prev.filter(r => r.id !== roomId));
       toast.success('Room deleted');
-    } catch {
-      toast.error('Could not delete room');
+    } catch (e) {
+      toast.error(getErrorMessage(e, 'Could not delete room'));
     } finally {
       setDeletingId(null);
     }
@@ -154,7 +155,7 @@ export default function RoomAdmin() {
             <button className="btn btn-clay" onClick={() => setShowModal(true)} style={{ marginTop: 20 }}>Add Room</button>
           </div>
         ) : (
-          <div className="card">
+          <div className="card table-scroll">
             <table className="data-table">
               <thead>
                 <tr>
@@ -174,7 +175,7 @@ export default function RoomAdmin() {
                     <td style={{ fontWeight: 700 }}>{room.type}</td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>
-                        ₹{Number(room.basePrice).toLocaleString('en-IN')}
+                        {formatINR(room.basePrice)}
                       </span>
                       <span style={{ color: 'var(--ink-mid)', fontSize: '0.78rem' }}>/night</span>
                     </td>

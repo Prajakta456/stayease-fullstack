@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -6,8 +7,27 @@ export default function Navbar() {
   const loc = useLocation();
   const navigate = useNavigate();
   const { user, logout, isHotelManager } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // The account menu opens on click (works on touch screens and with the keyboard), and closes on
+  // an outside click, Escape, or navigation
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onClick = (e) => { if (!menuRef.current?.contains(e.target)) setMenuOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => setMenuOpen(false), [loc.pathname]);
 
   const handleLogout = async () => {
+    setMenuOpen(false);
     await logout();
     toast.success('Signed out successfully');
     navigate('/');
@@ -49,11 +69,19 @@ export default function Navbar() {
               </Link>
             </>
           ) : (
-            <div className="navbar-user">
-              <div className="navbar-avatar" title={user.name}>
+            <div className={`navbar-user ${menuOpen ? 'open' : ''}`} ref={menuRef}>
+              <button
+                type="button"
+                className="navbar-avatar"
+                title={user.name}
+                aria-label={`Account menu for ${user.name}`}
+                aria-haspopup="true"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen(open => !open)}
+              >
                 {user.name?.charAt(0)?.toUpperCase()}
-              </div>
-              <div className="navbar-dropdown">
+              </button>
+              <div className="navbar-dropdown" role="menu">
                 <div className="dropdown-name">{user.name}</div>
                 <div className="dropdown-role">
                   {isHotelManager ? '🏨 Hotel Manager' : '🏖️ Guest'}
