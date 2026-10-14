@@ -162,8 +162,5 @@ cd airbnb-frontend && npm test     # frontend: unit tests for date and price hel
 
 ---
 
-## Project origins
-The backend started from the hotel-booking project in the [Coding Shuttle](https://www.codingshuttle.com/) Spring Boot course (hence the `com.codingshuttle.projects` package). This repository adds a React frontend and reworks the backend for production use: JWT authentication with ownership-based authorization, the complete booking lifecycle (holds, payments, cancellations, expiry), consistent inventory under concurrent bookings, MySQL with Flyway migrations, validation and error handling across the API, API documentation and an automated test suite.
-
 ## License
 This project is for educational purposes.
