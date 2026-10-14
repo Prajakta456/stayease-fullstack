@@ -8,11 +8,11 @@
 		<version>3.4.0</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.codingshuttle.projects</groupId>
+	<groupId>com.stayease</groupId>
 	<artifactId>airBnbApp</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>airBnbApp</name>
-	<description>AirBnb Clone Project in Coding Shuttle</description>
+	<description>StayEase hotel booking API</description>
 	<url/>
 	<licenses>
 		<license/>
