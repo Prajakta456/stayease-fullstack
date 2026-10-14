@@ -1,5 +1,7 @@
 # StayEase — Hotel Booking Platform (Airbnb-style)
 
+[![CI](https://github.com/sanikadeokule/airbnb-fullstack/actions/workflows/ci.yml/badge.svg)](https://github.com/sanikadeokule/airbnb-fullstack/actions/workflows/ci.yml)
+
 A full-stack hotel booking app: guests search hotels by city and dates, see live prices and availability, book rooms with a time-limited hold and pay; hotel managers publish hotels, add room types and manage their listings.
 
 **Stack:** React 18 · Spring Boot 3.4 (Java 17+) · Spring Security with JWT · MySQL 8 + Flyway · JUnit 5, MockMvc and Testcontainers
@@ -52,14 +54,25 @@ airbnb-fullstack/
 │   │   └── db/migration/      # Flyway migrations
 │   ├── db/                    # SQL to create a local MySQL database and user
 │   └── .env.example           # local settings template
-├── airbnb-frontend/           # React app (Create React App)
+├── airbnb-frontend/           # React app (Create React App), served by nginx in Docker
 │   └── src/                   # pages · components · context · services/api.js · utils
-└── docker-compose.yml         # MySQL 8 for local development
+├── .github/workflows/ci.yml   # CI: backend tests, frontend tests and build, Docker smoke test
+└── docker-compose.yml         # MySQL + backend + frontend
 ```
 
 ---
 
-## Getting started
+## Quick start with Docker
+
+With Docker installed, one command builds and starts MySQL, the backend and the frontend:
+
+```bash
+docker compose up --build
+```
+
+Then open **http://localhost:3000** and sign in with a [demo account](#demo-accounts). The backend runs with the `prod` profile and demo data; Swagger UI is at http://localhost:8080/api/v1/swagger-ui/index.html. In the containers, nginx serves the frontend and forwards `/api` to the backend, so the browser only talks to one origin. Stop with `docker compose down` (add `--volumes` to also delete the database).
+
+## Running from source
 
 ### Prerequisites
 - Java 17 or newer (the Maven wrapper `./mvnw` is included, so Maven itself isn't required)
@@ -90,7 +103,11 @@ The API runs at **http://localhost:8080/api/v1**. Settings are read from `airBnb
 | `JWT_SECRET` | Token signing key, at least 32 characters (`openssl rand -base64 48`). If unset, a random key is used and every restart signs everyone out | *(random)* |
 | `JWT_EXPIRATION_MINUTES` | Token lifetime | `60` |
 | `SEED_DEMO_DATA` | On an empty database, create demo accounts and three hotels. **Local development only** | `false` |
-| `API_DOCS_ENABLED` | Serve Swagger UI and the OpenAPI spec | `true` |
+| `API_DOCS_ENABLED` | Serve Swagger UI and the OpenAPI spec | `true` (`false` with the `prod` profile) |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the API | `http://localhost:3000` |
+| `SPRING_PROFILES_ACTIVE` | `prod` makes `JWT_SECRET` mandatory and hides API docs by default | *(none)* |
+
+Health checks: `GET /api/v1/actuator/health`, plus `/liveness` and `/readiness` probes for container platforms.
 
 ### 3. Frontend
 
@@ -144,12 +161,13 @@ Every response has the shape `{ "timeStamp": …, "data": …, "error": { "statu
 ## Testing
 
 ```bash
-cd airBnbApp && ./mvnw test        # backend: 78 tests
+cd airBnbApp && ./mvnw test        # backend: 86 tests
 cd airbnb-frontend && npm test     # frontend: unit tests for date and price helpers
 ```
 
 - Backend integration tests run the full Spring context with MockMvc against an in-memory H2 database (MySQL mode). They cover authentication and authorization, ownership checks, the booking lifecycle with inventory counts asserted after every step, hold expiry, search, hotel administration, pricing strategies, error responses, validation and the API docs.
 - `MySqlSchemaTest` starts a real MySQL 8.4 with Testcontainers to verify the Flyway migrations, schema validation, the native search SQL and row locking. It runs when Docker is available and is skipped otherwise.
+- **CI** (GitHub Actions) runs on every pull request and push to `main`: the backend suite including `MySqlSchemaTest`, the frontend tests and production build, and a smoke test that starts the whole stack with Docker Compose and checks search and login through the nginx proxy.
 
 ---
 

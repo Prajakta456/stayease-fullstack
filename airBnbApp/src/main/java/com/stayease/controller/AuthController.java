@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Duration;
 import java.util.Locale;
 
-@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor

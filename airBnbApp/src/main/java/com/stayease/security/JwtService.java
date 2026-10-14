@@ -27,7 +27,11 @@ public class JwtService {
     private final Duration expiration;
 
     public JwtService(@Value("${jwt.secret:}") String secret,
-                      @Value("${jwt.expiration-minutes:60}") long expirationMinutes) {
+                      @Value("${jwt.expiration-minutes:60}") long expirationMinutes,
+                      @Value("${jwt.require-secret:false}") boolean requireSecret) {
+        if (requireSecret && (secret == null || secret.isBlank())) {
+            throw new IllegalStateException("JWT_SECRET must be set (jwt.require-secret=true, e.g. in the prod profile)");
+        }
         this.key = buildKey(secret);
         this.expiration = Duration.ofMinutes(expirationMinutes);
     }

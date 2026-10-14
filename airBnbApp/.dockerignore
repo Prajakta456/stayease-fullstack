@@ -1,0 +1,6 @@
+target/
+.env
+*.local.sql
+.idea/
+.vscode/
+*.iml

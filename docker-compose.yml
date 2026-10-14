@@ -1,11 +1,10 @@
-# Local MySQL for development, for anyone who doesn't have MySQL installed:
-#   docker compose up -d db
-# then in airBnbApp/.env:
-#   DB_URL=jdbc:mysql://localhost:3307/airbnb
-#   DB_USERNAME=airbnb_app
-#   DB_PASSWORD=airbnb_dev_password
-# Port 3307 avoids clashing with a MySQL server already installed on 3306.
-# The passwords below are development defaults only; override them via environment variables.
+# The whole app in containers:
+#   docker compose up --build        -> http://localhost:3000 (sign in as guest@demo.com / password123)
+# Only the database, for running the backend and frontend from source:
+#   docker compose up -d db          -> MySQL on localhost:3307 (see airBnbApp/.env.example)
+#
+# The passwords and JWT secret below are development defaults; override them with environment
+# variables (e.g. JWT_SECRET=... docker compose up) and never use them for a real deployment.
 
 services:
   db:
@@ -25,6 +24,38 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  backend:
+    build: ./airBnbApp
+    container_name: airbnb-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://db:3306/airbnb
+      DB_USERNAME: airbnb_app
+      DB_PASSWORD: ${DB_PASSWORD:-airbnb_dev_password}
+      JWT_SECRET: ${JWT_SECRET:-docker-compose-development-secret-change-me}
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
+    ports:
+      # Direct API access, e.g. Swagger UI at http://localhost:8080/api/v1/swagger-ui/index.html
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./airbnb-frontend
+      args:
+        REACT_APP_API_URL: /api/v1
+        REACT_APP_SHOW_DEMO_LOGINS: "true"
+    container_name: airbnb-frontend
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   mysql-data:
