@@ -34,7 +34,8 @@ airbnb-fullstack/
 | Spring Boot | 3.4 |
 | Spring Security | 3.4 |
 | Spring Data JPA | 3.4 |
-| PostgreSQL | runtime |
+| MySQL | 8 |
+| Flyway | migrations |
 | ModelMapper | 3.2.2 |
 | Lombok | latest |
 
@@ -73,43 +74,41 @@ airbnb-fullstack/
 
 - Node.js 18+ and npm
 - Java 17+
-- Maven 3.8+
-- PostgreSQL 14+
+- MySQL 8 (installed locally, or via Docker)
+- Maven is not required: the project ships the Maven wrapper (`./mvnw`)
 
 ---
 
 ### Backend Setup
 
-1. Create a PostgreSQL database:
+1. **Get a MySQL 8 database.** Either:
+   - **Local MySQL**: run [`airBnbApp/db/create-local-database.sql`](airBnbApp/db/create-local-database.sql) as an admin user (e.g. in MySQL Workbench) to create the `airbnb` database and an `airbnb_app` user, or
+   - **Docker**: `docker compose up -d db` starts MySQL on port **3307** with the defaults from [`docker-compose.yml`](docker-compose.yml).
 
-```sql
-CREATE DATABASE airbnb_db;
-```
-
-2. Update `airBnbApp/src/main/resources/application.properties` with your database credentials:
-
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/airbnb_db
-spring.datasource.username=your_username
-spring.datasource.password=your_password
-spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
-spring.jpa.hibernate.ddl-auto=update
-```
-
-3. Set a JWT signing secret (at least 32 characters). Without it the backend generates a random key at startup and every restart signs everyone out:
-
-```bash
-export JWT_SECRET="$(openssl rand -base64 48)"
-# optional: token lifetime in minutes (default 60)
-export JWT_EXPIRATION_MINUTES=60
-```
-
-4. Run the backend:
+2. **Create `airBnbApp/.env`** from the example and fill in your database credentials and a JWT secret (at least 32 characters, e.g. `openssl rand -base64 48`). The file is git-ignored.
 
 ```bash
 cd airBnbApp
+cp .env.example .env
+```
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `DB_URL` | JDBC URL | `jdbc:mysql://localhost:3306/airbnb` |
+| `DB_USERNAME` / `DB_PASSWORD` | Database credentials | `airbnb_app` / *(none)* |
+| `JWT_SECRET` | Token signing key; if unset, a random key is used and restarts sign everyone out | *(random)* |
+| `JWT_EXPIRATION_MINUTES` | Token lifetime | `60` |
+| `SEED_DEMO_DATA` | Create demo accounts and hotels when the database is empty (local only) | `false` |
+
+The same variables can be set as real environment variables instead (e.g. in production).
+
+3. **Run the backend.** Flyway creates the tables on first start (`src/main/resources/db/migration`).
+
+```bash
 ./mvnw spring-boot:run
 ```
+
+With `SEED_DEMO_DATA=true` you can sign in straight away as `guest@demo.com` or `manager@demo.com` (password `password123`).
 
 The backend starts on **http://localhost:8080** with context path `/api/v1`.
 

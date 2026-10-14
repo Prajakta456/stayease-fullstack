@@ -1,0 +1,30 @@
+# Local MySQL for development, for anyone who doesn't have MySQL installed:
+#   docker compose up -d db
+# then in airBnbApp/.env:
+#   DB_URL=jdbc:mysql://localhost:3307/airbnb
+#   DB_USERNAME=airbnb_app
+#   DB_PASSWORD=airbnb_dev_password
+# Port 3307 avoids clashing with a MySQL server already installed on 3306.
+# The passwords below are development defaults only; override them via environment variables.
+
+services:
+  db:
+    image: mysql:8.4
+    container_name: airbnb-mysql
+    environment:
+      MYSQL_DATABASE: airbnb
+      MYSQL_USER: airbnb_app
+      MYSQL_PASSWORD: ${DB_PASSWORD:-airbnb_dev_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_password}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root_dev_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql-data:
