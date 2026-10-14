@@ -60,7 +60,7 @@ export const getHotelInfo = (hotelId, stay) =>
 export const createHotel = (hotelDto) =>
   api.post('/admin/hotels', hotelDto).then(r => r.data?.data || r.data);
 
-// ✅ NEW: fetch all hotels for the admin dashboard list
+// The signed-in manager's hotels
 export const getAllHotels = () =>
   api.get('/admin/hotels').then(r => r.data?.data || r.data);
 

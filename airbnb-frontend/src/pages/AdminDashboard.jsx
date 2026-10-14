@@ -124,7 +124,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('hotels');
   const [hotels, setHotels] = useState([]);
-  const [loading, setLoading] = useState(true); // ✅ NEW: loading state
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingHotel, setEditingHotel] = useState(null);
   const [loadingId, setLoadingId] = useState(null);
@@ -133,7 +133,6 @@ export default function AdminDashboard() {
   const [fetchedHotel, setFetchedHotel] = useState(null);
   const [fetching, setFetching] = useState(false);
 
-  // ✅ FIXED: fetch all hotels from DB on mount
   useEffect(() => {
     getAllHotels()
       .then(data => setHotels(Array.isArray(data) ? data : []))
@@ -249,7 +248,6 @@ export default function AdminDashboard() {
         {/* Hotels Tab */}
         {activeTab === 'hotels' && (
           <div>
-            {/* ✅ NEW: show spinner while loading */}
             {loading ? (
               <div className="loading-center"><div className="spinner" /></div>
             ) : hotels.length === 0 ? (

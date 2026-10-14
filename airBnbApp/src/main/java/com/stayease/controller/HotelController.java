@@ -29,7 +29,7 @@ public class HotelController {
         return new ResponseEntity<>(hotel, HttpStatus.CREATED);
     }
 
-    // ✅ NEW: Get all hotels
+    // Only the signed-in manager's hotels
     @GetMapping
     public ResponseEntity<List<HotelDto>> getAllHotels() {
         log.info("Fetching all hotels");

@@ -24,6 +24,3 @@ desktop.ini
 # Logs
 *.log
 logs/
-
-# Claude Cowork internal
-.sixth/

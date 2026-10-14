@@ -15,7 +15,7 @@ import java.util.List;
 @Getter
 @Setter
 @Table(name = "hotel")
-// ✅ FIXED: prevents Jackson from crashing on Hibernate lazy-load proxy fields
+// Lets Jackson serialise Hibernate lazy-loading proxies without failing on their internal fields
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Hotel {
 

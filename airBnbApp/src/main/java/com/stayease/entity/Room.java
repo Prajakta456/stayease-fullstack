@@ -1,6 +1,5 @@
 package com.stayease.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -30,16 +29,11 @@ public class Room {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal basePrice;
 
-    // @Column(columnDefinition = "TEXT[]")
-    // private String[] photos;
-
-    // @Column(columnDefinition = "TEXT[]")
-    // private String[] amenities;
     @ElementCollection
-     private List<String> photos;
+    private List<String> photos;
 
-     @ElementCollection
-     private List<String> amenities;
+    @ElementCollection
+    private List<String> amenities;
 
     @Column(nullable = false)
     private Integer totalCount;
