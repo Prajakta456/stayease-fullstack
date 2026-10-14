@@ -4,6 +4,7 @@ import com.codingshuttle.projects.airBnbApp.dto.RoomDto;
 import com.codingshuttle.projects.airBnbApp.entity.Hotel;
 import com.codingshuttle.projects.airBnbApp.entity.Room;
 import com.codingshuttle.projects.airBnbApp.exception.ResourceNotFoundException;
+import com.codingshuttle.projects.airBnbApp.repository.BookingRepository;
 import com.codingshuttle.projects.airBnbApp.repository.HotelRepository;
 import com.codingshuttle.projects.airBnbApp.repository.RoomRepository;
 import com.codingshuttle.projects.airBnbApp.security.SecurityUtils;
@@ -19,29 +20,33 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class RoomServiceImpl implements RoomService{
 
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
     private final InventoryService inventoryService;
     private final ModelMapper modelMapper;
+    private final BookingRepository bookingRepository;
 
     @Override
     public RoomDto createNewRoom(Long hotelId, RoomDto roomDto) {
         log.info("Creating a new room in hotel with ID: {}", hotelId);
         Hotel hotel = getOwnedHotel(hotelId);
         Room room = modelMapper.map(roomDto, Room.class);
+        room.setId(null);
         room.setHotel(hotel);
         room = roomRepository.save(room);
 
         if (hotel.getActive()) {
-            inventoryService.initializeRoomForAYear(room);
+            inventoryService.ensureInventory(room); // same transaction: the room and its inventory are created together
         }
 
         return modelMapper.map(room, RoomDto.class);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RoomDto> getAllRoomsInHotel(Long hotelId) {
         log.info("Getting all rooms in hotel with ID: {}", hotelId);
         Hotel hotel = getOwnedHotel(hotelId);
@@ -53,6 +58,7 @@ public class RoomServiceImpl implements RoomService{
     }
 
     @Override
+    @Transactional(readOnly = true)
     public RoomDto getRoomById(Long hotelId, Long roomId) {
         log.info("Getting the room with ID: {}", roomId);
         return modelMapper.map(getOwnedRoom(hotelId, roomId), RoomDto.class);
@@ -63,6 +69,9 @@ public class RoomServiceImpl implements RoomService{
     public void deleteRoomById(Long hotelId, Long roomId) {
         log.info("Deleting the room with ID: {}", roomId);
         Room room = getOwnedRoom(hotelId, roomId);
+        if (bookingRepository.existsByRoomId(roomId)) {
+            throw new IllegalStateException("This room has bookings and cannot be deleted");
+        }
         inventoryService.deleteAllInventories(room);
         roomRepository.deleteById(roomId);
     }

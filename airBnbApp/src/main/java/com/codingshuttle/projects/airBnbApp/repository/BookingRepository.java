@@ -31,6 +31,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Long> findIdsByStatusInAndCreatedAtBefore(@Param("statuses") Collection<BookingStatus> statuses,
                                                     @Param("cutoff") LocalDateTime cutoff);
 
+    boolean existsByHotelId(Long hotelId);
+
+    boolean existsByRoomId(Long roomId);
+
     @EntityGraph(attributePaths = {"hotel", "room", "guests"})
     List<Booking> findAllByUserIdOrderByCreatedAtDesc(Long userId);
 }

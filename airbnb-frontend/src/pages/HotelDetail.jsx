@@ -92,12 +92,25 @@ export default function HotelDetail() {
 
   const [guests, setGuests] = useState([{ name: '', gender: 'MALE', age: '' }]);
 
+  const validDates = checkIn && checkOut && checkOut > checkIn;
+
+  // Re-fetch when the stay changes so each room shows its real price and availability for those nights
   useEffect(() => {
-    getHotelInfo(hotelId)
-      .then(setInfo)
-      .catch(() => toast.error('Could not load hotel info'))
+    const stay = validDates ? { startDate: checkIn, endDate: checkOut, roomsCount } : undefined;
+    getHotelInfo(hotelId, stay)
+      .then(data => {
+        setInfo(data);
+        // Drop a selection that is no longer bookable for the new dates
+        setSelectedRoom(current => {
+          const fresh = current && data.rooms?.find(r => r.id === current.id);
+          return fresh && fresh.available !== false ? fresh : null;
+        });
+      })
+      .catch(e => toast.error(getErrorMessage(e, 'Could not load hotel info')))
       .finally(() => setLoading(false));
-  }, [hotelId]);
+  }, [hotelId, checkIn, checkOut, roomsCount, validDates]);
+
+  const nightlyPrice = (room) => Number(room.price ?? room.basePrice);
 
   const handleGuestChange = (idx, field, val) => {
     setGuests(g => g.map((guest, i) => i === idx ? { ...guest, [field]: val } : guest));
@@ -278,11 +291,14 @@ export default function HotelDetail() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {rooms.map(room => (
+                    {rooms.map(room => {
+                      const unavailable = room.available === false;
+                      return (
                       <div
                         key={room.id}
                         className={`room-card ${selectedRoom?.id === room.id ? 'selected' : ''}`}
-                        onClick={() => setSelectedRoom(room)}
+                        onClick={() => !unavailable && setSelectedRoom(room)}
+                        style={unavailable ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                       >
                         <div className="room-card-info">
                           <h3>{room.type}</h3>
@@ -299,10 +315,12 @@ export default function HotelDetail() {
                           )}
                         </div>
                         <div className="room-card-price">
-                          <div className="amount">₹{Number(room.basePrice).toLocaleString('en-IN')}</div>
-                          <div className="per-night">per night</div>
+                          <div className="amount">{formatINR(nightlyPrice(room))}</div>
+                          <div className="per-night">{room.price != null ? 'avg. per night for your dates' : 'per night'}</div>
                           <div style={{ marginTop: 8 }}>
-                            {selectedRoom?.id === room.id ? (
+                            {unavailable ? (
+                              <span className="badge badge-gray">Not available for these dates</span>
+                            ) : selectedRoom?.id === room.id ? (
                               <span className="badge badge-clay">✓ Selected</span>
                             ) : (
                               <span style={{ color: 'var(--clay)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Select →</span>
@@ -310,7 +328,8 @@ export default function HotelDetail() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -491,8 +510,8 @@ export default function HotelDetail() {
                           <span style={{ fontWeight: 600 }}>{selectedRoom.type}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                          <span style={{ color: 'var(--ink-mid)' }}>Base price</span>
-                          <span>₹{Number(selectedRoom.basePrice).toLocaleString('en-IN')}/night</span>
+                          <span style={{ color: 'var(--ink-mid)' }}>Nightly price</span>
+                          <span>{formatINR(nightlyPrice(selectedRoom))}/night</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
                           <span style={{ color: 'var(--ink-mid)' }}>Nights</span>
@@ -506,7 +525,7 @@ export default function HotelDetail() {
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ fontWeight: 700 }}>{booking ? 'Total' : 'Estimated total'}</span>
                           <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--clay-dark)' }}>
-                            {formatINR(booking ? booking.amount : Number(selectedRoom.basePrice) * nights * roomsCount)}
+                            {formatINR(booking ? booking.amount : nightlyPrice(selectedRoom) * nights * roomsCount)}
                           </span>
                         </div>
                       </div>
