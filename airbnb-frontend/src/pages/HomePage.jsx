@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { todayISO, addDaysISO, nightsBetween } from '../utils/format';
 
 const POPULAR_CITIES = ['Mumbai', 'Delhi', 'Bangalore', 'Goa', 'Jaipur', 'Hyderabad'];
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const today = todayISO();
+  const tomorrow = addDaysISO(today, 1);
 
   const [search, setSearch] = useState({
     city: '',
@@ -15,16 +16,22 @@ export default function HomePage() {
     roomsCount: 1,
   });
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    const params = new URLSearchParams({
-      city: search.city,
-      startDate: search.startDate,
-      endDate: search.endDate,
-      roomsCount: search.roomsCount,
-    });
+  const goToSearch = ({ city, startDate, endDate, roomsCount }) => {
+    const params = new URLSearchParams({ city, startDate, endDate, roomsCount });
     navigate(`/search?${params}`);
   };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    goToSearch(search);
+  };
+
+  // Moving check-in on or past check-out pushes check-out to the next day
+  const handleCheckInChange = (startDate) => setSearch(p => ({
+    ...p,
+    startDate,
+    endDate: startDate && nightsBetween(startDate, p.endDate) === 0 ? addDaysISO(startDate, 1) : p.endDate,
+  }));
 
   return (
     <>
@@ -66,7 +73,8 @@ export default function HomePage() {
                 type="date"
                 value={search.startDate}
                 min={today}
-                onChange={e => setSearch(p => ({ ...p, startDate: e.target.value }))}
+                onChange={e => handleCheckInChange(e.target.value)}
+                required
               />
             </div>
             <div className="search-divider" />
@@ -75,8 +83,9 @@ export default function HomePage() {
               <input
                 type="date"
                 value={search.endDate}
-                min={search.startDate}
+                min={addDaysISO(search.startDate || today, 1)}
                 onChange={e => setSearch(p => ({ ...p, endDate: e.target.value }))}
+                required
               />
             </div>
             <div className="search-divider" />
@@ -103,7 +112,7 @@ export default function HomePage() {
             {POPULAR_CITIES.map(city => (
               <button
                 key={city}
-                onClick={() => navigate(`/search?city=${city}&startDate=${today}&endDate=${tomorrow}&roomsCount=1`)}
+                onClick={() => goToSearch({ city, startDate: today, endDate: tomorrow, roomsCount: 1 })}
                 style={{
                   background: 'rgba(255,255,255,0.1)',
                   border: '1px solid rgba(255,255,255,0.2)',

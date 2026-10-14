@@ -913,6 +913,58 @@ select.form-input {
 .stagger-3 { animation-delay: 0.15s; }
 .stagger-4 { animation-delay: 0.2s; }
 
+/* ===== LAYOUT HELPERS ===== */
+/* Hotel page: content + sticky price summary; stacks on narrow screens */
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 32px;
+  align-items: start;
+}
+
+.form-grid-2,
+.form-grid-3 {
+  display: grid;
+  gap: 12px;
+}
+.form-grid-2 { grid-template-columns: 1fr 1fr; }
+.form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* Wide admin tables scroll sideways instead of breaking the page */
+.table-scroll {
+  overflow-x: auto;
+}
+
+@media (max-width: 960px) {
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .detail-layout > div[style*="sticky"] {
+    position: static !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-grid-2,
+  .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .form-grid-2 > [style*="grid-column"] {
+    grid-column: auto !important;
+  }
+}
+
+/* Respect the OS "reduce motion" setting */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in {
+    animation: none;
+  }
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .search-box {
@@ -1133,9 +1185,16 @@ select.form-input {
 }
 .dropdown-btn:hover { background: rgba(200,169,126,0.3); }
 
-/* Show dropdown on avatar hover */
-.navbar-user:hover .navbar-dropdown {
+/* Show dropdown on hover (mouse) or when opened by click/tap (.open) */
+.navbar-user:hover .navbar-dropdown,
+.navbar-user.open .navbar-dropdown {
   display: block;
+}
+
+button.navbar-avatar {
+  border: none;
+  font: inherit;
+  cursor: pointer;
 }
 
 /* Access denied banner */

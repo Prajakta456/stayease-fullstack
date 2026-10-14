@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getMyBookings, cancelBooking, payForBooking, getErrorMessage } from '../services/api';
+import { formatDate, formatINR, parseLocalDate } from '../utils/format';
 
 const STATUS_BADGES = {
   RESERVED: { label: 'Awaiting guests', className: 'badge-yellow' },
@@ -13,10 +14,7 @@ const STATUS_BADGES = {
 
 const ACTIVE_STATUSES = ['RESERVED', 'GUESTS_ADDED', 'CONFIRMED'];
 
-const formatDate = (iso) =>
-  new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-
-const isBeforeCheckIn = (booking) => new Date(`${booking.checkInDate}T00:00:00`) > new Date();
+const isBeforeCheckIn = (booking) => parseLocalDate(booking.checkInDate) > new Date();
 
 // Guests were added but payment never completed, and the rooms are still held
 const canCompletePayment = (booking) =>
@@ -110,7 +108,7 @@ export default function MyBookings() {
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                       <span className={`badge ${badge.className}`}>{badge.label}</span>
                       <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>
-                        ₹{Number(booking.amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        {formatINR(booking.amount)}
                       </span>
                       {canCompletePayment(booking) && (
                         <button

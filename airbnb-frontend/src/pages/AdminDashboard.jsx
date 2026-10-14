@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 
 const EMPTY_HOTEL = {
   name: '', city: '', photos: [], amenities: [],
-  contactInfo: { phoneNumber: '', email: '', address: '', website: '' }
+  contactInfo: { phoneNumber: '', email: '', address: '', location: '' }
 };
 
 function HotelFormModal({ hotel, onClose, onSaved }) {
@@ -62,7 +62,7 @@ function HotelFormModal({ hotel, onClose, onSaved }) {
         <div className="modal-body">
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Hotel Name *</label>
                   <input className="form-input" required value={form.name} onChange={e => handleChange('name', e.target.value)} placeholder="Grand Palace" />
@@ -82,7 +82,7 @@ function HotelFormModal({ hotel, onClose, onSaved }) {
               </div>
               <div style={{ borderTop: '1px solid var(--ash-dark)', paddingTop: 16 }}>
                 <p style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-mid)', marginBottom: 12 }}>Contact Information</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Phone</label>
                     <input className="form-input" value={form.contactInfo?.phoneNumber || ''} onChange={e => handleContact('phoneNumber', e.target.value)} placeholder="+91 98765 43210" />
@@ -94,6 +94,10 @@ function HotelFormModal({ hotel, onClose, onSaved }) {
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                     <label className="form-label">Address</label>
                     <input className="form-input" value={form.contactInfo?.address || ''} onChange={e => handleContact('address', e.target.value)} placeholder="123 Main St, Mumbai 400001" />
+                  </div>
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label className="form-label">Location / landmark</label>
+                    <input className="form-input" value={form.contactInfo?.location || ''} onChange={e => handleContact('location', e.target.value)} placeholder="Near Juhu Beach" />
                   </div>
                 </div>
               </div>
@@ -133,7 +137,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     getAllHotels()
       .then(data => setHotels(Array.isArray(data) ? data : []))
-      .catch(() => toast.error('Could not load hotels'))
+      .catch(e => toast.error(getErrorMessage(e, 'Could not load hotels')))
       .finally(() => setLoading(false));
   }, []);
 
@@ -198,8 +202,8 @@ export default function AdminDashboard() {
       if (!hotels.find(hotel => hotel.id === h.id)) {
         setHotels(prev => [...prev, h]);
       }
-    } catch {
-      toast.error('Hotel not found');
+    } catch (e) {
+      toast.error(getErrorMessage(e, 'Hotel not found'));
       setFetchedHotel(null);
     } finally {
       setFetching(false);
@@ -256,7 +260,7 @@ export default function AdminDashboard() {
                 <button className="btn btn-clay" onClick={openCreate} style={{ marginTop: 20 }}>Create Hotel</button>
               </div>
             ) : (
-              <div className="card">
+              <div className="card table-scroll">
                 <table className="data-table">
                   <thead>
                     <tr>

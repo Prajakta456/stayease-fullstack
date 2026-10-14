@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { signup } from '../services/api';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { signup, getErrorMessage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   const [form, setForm] = useState({
@@ -37,10 +38,11 @@ export default function SignupPage() {
       login(userData);
       toast.success(`Welcome, ${userData.name}! Account created successfully.`);
       const isManager = userData.roles?.includes('HOTEL_MANAGER');
-      navigate(isManager ? '/admin' : '/', { replace: true });
+      // Guests return to the hotel they were booking, if they came from one
+      const from = location.state?.from;
+      navigate(isManager ? '/admin' : from || '/', { replace: true, state: location.state?.fromState });
     } catch (err) {
-      const msg = err.response?.data?.error?.message || err.response?.data?.message || 'Signup failed';
-      toast.error(msg);
+      toast.error(getErrorMessage(err, 'Could not create your account. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -55,7 +57,7 @@ export default function SignupPage() {
         <h1 className="auth-title">Create your account</h1>
         <p className="auth-subtitle">
           Already have an account?{' '}
-          <Link to="/login" className="auth-link">Sign in</Link>
+          <Link to="/login" state={location.state} className="auth-link">Sign in</Link>
         </p>
 
         {/* Role toggle */}

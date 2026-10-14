@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { getHotelInfo, initialiseBooking, addGuests, payForBooking, cancelBooking, getErrorMessage } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { todayISO, addDaysISO, nightsBetween, formatINR } from '../utils/format';
 import toast from 'react-hot-toast';
 
 const STEP_LABELS = ['Select Room', 'Guest Details', 'Payment', 'Confirmed'];
 
-const formatINR = (amount) => `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const formatTime = (iso) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
 function StepIndicator({ current }) {
@@ -27,7 +28,7 @@ function GuestForm({ index, guest, onChange }) {
   return (
     <div style={{ background: 'var(--ash)', borderRadius: 'var(--radius-sm)', padding: 20, marginBottom: 16 }}>
       <p style={{ fontWeight: 600, marginBottom: 16, fontSize: '0.9rem' }}>Guest {index + 1}</p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="form-grid-2">
         <div className="form-group" style={{ gridColumn: '1 / -1' }}>
           <label className="form-label">Full Name</label>
           <input
@@ -72,27 +73,36 @@ export default function HotelDetail() {
   const { hotelId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, isGuest } = useAuth();
   const state = location.state || {};
 
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [step, setStep] = useState(0);
   const [booking, setBooking] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const today = todayISO();
 
   const [checkIn, setCheckIn] = useState(state.startDate || today);
-  const [checkOut, setCheckOut] = useState(state.endDate || tomorrow);
+  const [checkOut, setCheckOut] = useState(state.endDate || addDaysISO(state.startDate || today, 1));
   const [roomsCount, setRoomsCount] = useState(state.roomsCount || 1);
 
-  const nights = Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000));
+  const nights = nightsBetween(checkIn, checkOut);
+
+  // Moving check-in past check-out pushes check-out to the next day
+  const handleCheckInChange = (value) => {
+    setCheckIn(value);
+    if (value && nightsBetween(value, checkOut) === 0) {
+      setCheckOut(addDaysISO(value, 1));
+    }
+  };
 
   const [guests, setGuests] = useState([{ name: '', gender: 'MALE', age: '' }]);
 
-  const validDates = checkIn && checkOut && checkOut > checkIn;
+  const validDates = nights > 0;
 
   // Re-fetch when the stay changes so each room shows its real price and availability for those nights
   useEffect(() => {
@@ -100,13 +110,16 @@ export default function HotelDetail() {
     getHotelInfo(hotelId, stay)
       .then(data => {
         setInfo(data);
+        setLoadError(null);
         // Drop a selection that is no longer bookable for the new dates
         setSelectedRoom(current => {
           const fresh = current && data.rooms?.find(r => r.id === current.id);
           return fresh && fresh.available !== false ? fresh : null;
         });
       })
-      .catch(e => toast.error(getErrorMessage(e, 'Could not load hotel info')))
+      .catch(e => setLoadError(e.response?.status === 404
+        ? 'This hotel does not exist or is not open for bookings.'
+        : getErrorMessage(e, 'Could not load this hotel. Please try again.')))
       .finally(() => setLoading(false));
   }, [hotelId, checkIn, checkOut, roomsCount, validDates]);
 
@@ -121,6 +134,13 @@ export default function HotelDetail() {
 
   const handleInitBooking = async () => {
     if (!selectedRoom) return toast.error('Please select a room');
+    if (!user) {
+      // Browsing is public; come back to this hotel with the same stay after signing in
+      return navigate('/login', {
+        state: { from: location.pathname, fromState: { startDate: checkIn, endDate: checkOut, roomsCount } },
+      });
+    }
+    if (!isGuest) return toast.error('Sign in with a guest account to book a stay');
     setSubmitting(true);
     try {
       const b = await initialiseBooking({
@@ -187,7 +207,7 @@ export default function HotelDetail() {
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
   if (!info) return (
     <div className="container" style={{ padding: '80px 24px', textAlign: 'center' }}>
-      <h2>Hotel not found</h2>
+      <h2>{loadError || 'Hotel not found'}</h2>
       <button className="btn btn-clay" onClick={() => navigate(-1)} style={{ marginTop: 16 }}>Go Back</button>
     </div>
   );
@@ -240,17 +260,12 @@ export default function HotelDetail() {
                 ))}
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <span className={`badge ${hotel.active ? 'badge-green' : 'badge-red'}`}>
-                {hotel.active ? '● Active' : '○ Inactive'}
-              </span>
-            </div>
           </div>
         </div>
       </div>
 
       <div className="container" style={{ padding: '40px 24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 32, alignItems: 'start' }}>
+        <div className="detail-layout">
 
           {/* Left: Room selection / steps */}
           <div>
@@ -263,14 +278,14 @@ export default function HotelDetail() {
                 <div className="card" style={{ marginBottom: 24 }}>
                   <div className="card-body">
                     <h2 className="section-title" style={{ marginBottom: 20 }}>Your Stay Details</h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                    <div className="form-grid-3">
                       <div className="form-group">
                         <label className="form-label">Check-in</label>
-                        <input className="form-input" type="date" value={checkIn} min={today} onChange={e => setCheckIn(e.target.value)} />
+                        <input className="form-input" type="date" value={checkIn} min={today} onChange={e => handleCheckInChange(e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Check-out</label>
-                        <input className="form-input" type="date" value={checkOut} min={checkIn} onChange={e => setCheckOut(e.target.value)} />
+                        <input className="form-input" type="date" value={checkOut} min={addDaysISO(checkIn, 1)} onChange={e => setCheckOut(e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Rooms</label>
@@ -338,10 +353,15 @@ export default function HotelDetail() {
                     <button
                       className="btn btn-clay btn-lg w-full"
                       onClick={handleInitBooking}
-                      disabled={submitting}
+                      disabled={submitting || !validDates}
                     >
-                      {submitting ? 'Reserving...' : 'Reserve Room →'}
+                      {submitting ? 'Reserving...' : user ? 'Reserve Room →' : 'Sign in to reserve →'}
                     </button>
+                    {!validDates && (
+                      <p style={{ color: 'var(--red)', fontSize: '0.85rem', marginTop: 8 }}>
+                        Check-out must be after check-in.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
