@@ -7,6 +7,7 @@ import com.codingshuttle.projects.airBnbApp.security.RateLimiter;
 import com.codingshuttle.projects.airBnbApp.security.SecurityUtils;
 import com.codingshuttle.projects.airBnbApp.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -38,14 +39,14 @@ public class AuthController {
     // configure server.forward-headers-strategy for that deployment instead of trusting X-Forwarded-For here.
 
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(@RequestBody SignupRequest request, HttpServletRequest http) {
+    public ResponseEntity<AuthResponse> signup(@RequestBody @Valid SignupRequest request, HttpServletRequest http) {
         rateLimiter.consume("signup:ip:" + http.getRemoteAddr(), signupPerIpPerHour, Duration.ofHours(1));
         AuthResponse response = authService.signup(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request, HttpServletRequest http) {
+    public ResponseEntity<AuthResponse> login(@RequestBody @Valid LoginRequest request, HttpServletRequest http) {
         rateLimiter.consume("login:ip:" + http.getRemoteAddr(), loginPerIpPerMinute, Duration.ofMinutes(1));
         if (request.getEmail() != null) {
             rateLimiter.consume("login:email:" + request.getEmail().toLowerCase(Locale.ROOT),

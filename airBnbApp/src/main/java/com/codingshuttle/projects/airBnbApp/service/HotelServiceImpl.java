@@ -1,5 +1,6 @@
 package com.codingshuttle.projects.airBnbApp.service;
 
+import com.codingshuttle.projects.airBnbApp.exception.ConflictException;
 import com.codingshuttle.projects.airBnbApp.dto.HotelDto;
 import com.codingshuttle.projects.airBnbApp.dto.HotelInfoDto;
 import com.codingshuttle.projects.airBnbApp.dto.RoomDto;
@@ -90,7 +91,7 @@ public class HotelServiceImpl implements HotelService {
     public void deleteHotelById(Long id) {
         Hotel hotel = getOwnedHotel(id);
         if (bookingRepository.existsByHotelId(id)) {
-            throw new IllegalStateException("This hotel has bookings and cannot be deleted; deactivate it instead");
+            throw new ConflictException("This hotel has bookings and cannot be deleted; deactivate it instead");
         }
 
         for (Room room : hotel.getRooms()) {
