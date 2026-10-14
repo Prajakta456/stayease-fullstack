@@ -50,6 +50,8 @@ public class SecurityConfig {
                 .accessDeniedHandler(restAuthHandlers))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/error").permitAll()
+                // API documentation (can be switched off with API_DOCS_ENABLED=false)
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/hotels/search").permitAll()
                 .requestMatchers(HttpMethod.GET, "/hotels/*/info").permitAll()

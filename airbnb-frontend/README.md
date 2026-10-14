@@ -1,114 +1,55 @@
-# StayEase — AirBnb App Frontend
+# StayEase — Frontend
 
-A complete React frontend for the Spring Boot AirBnb application.
+React single-page app for the StayEase hotel booking platform. See the [root README](../README.md) for the full setup, including the backend.
 
-## Tech Stack
-- React 18 + React Router v6
-- Axios (API calls)
-- react-hot-toast (notifications)
-- Custom CSS design system (no UI framework)
+## Tech stack
+- React 18 + React Router 6 (Create React App)
+- Axios for API calls (`src/services/api.js`)
+- react-hot-toast for notifications
+- Hand-written CSS design system in `src/index.css` (no UI framework)
 
-## Project Structure
+## Run
+
+```bash
+npm install
+npm start        # http://localhost:3000
+npm test         # unit tests
+npm run build    # production build in build/
+```
+
+The backend must be running on `http://localhost:8080/api/v1`, or set `REACT_APP_API_URL` in a `.env` file (see `.env.example`). Variables are baked in at build time.
+
+## Structure
 
 ```
 src/
+├── App.js                   # Routes
+├── context/AuthContext.jsx  # Signed-in user; signs out when the API reports an expired or revoked token
 ├── components/
-│   └── Navbar.jsx          # Sticky top navigation
+│   ├── Navbar.jsx           # Navigation and account menu
+│   └── ProtectedRoute.jsx   # Role-gated routes; redirects to sign-in and back
 ├── pages/
-│   ├── HomePage.jsx         # Hero + search form
-│   ├── SearchResults.jsx    # Hotel search results grid
-│   ├── HotelDetail.jsx      # Hotel info + 3-step booking flow
-│   ├── AdminDashboard.jsx   # Admin: create/edit/delete hotels
-│   └── RoomAdmin.jsx        # Admin: manage rooms per hotel
-├── services/
-│   └── api.js              # All API calls (mirrors backend controllers)
-├── App.js                   # Router
-├── index.css                # Full design system & CSS
-└── index.js                 # Entry point
+│   ├── HomePage.jsx         # Hero and search form
+│   ├── SearchResults.jsx    # Results grid; filters and page live in the URL
+│   ├── HotelDetail.jsx      # Rooms with live price/availability; reserve → guests → pay → confirmed
+│   ├── MyBookings.jsx       # Guest's bookings: cancel or finish paying
+│   ├── LoginPage.jsx / SignupPage.jsx
+│   ├── AdminDashboard.jsx   # Manager: create, edit, activate/deactivate, delete hotels
+│   └── RoomAdmin.jsx        # Manager: add and delete room types
+├── services/api.js          # All backend calls, the auth header and error-message helper
+└── utils/format.js          # Local-date and price helpers (with tests)
 ```
 
-## API Mapping
+## Routes
 
-| Frontend Page       | Backend Controller           | Endpoints Used |
-|---------------------|------------------------------|----------------|
-| HomePage            | -                            | -              |
-| SearchResults       | HotelBrowseController        | POST /hotels/search |
-| HotelDetail (view)  | HotelBrowseController        | GET /hotels/{id}/info |
-| HotelDetail (book)  | HotelBookingController       | POST /bookings/init, POST /bookings/{id}/addGuests |
-| AdminDashboard      | HotelController              | POST/GET/PUT/DELETE/PATCH /admin/hotels/** |
-| RoomAdmin           | RoomAdminController          | POST/GET/DELETE /admin/hotels/{id}/rooms/** |
+| Path | Access | Backend endpoints |
+|---|---|---|
+| `/` | Public | — |
+| `/search` | Public | `POST /hotels/search` |
+| `/hotels/:id` | Public (reserving needs a guest account) | `GET /hotels/{id}/info`, `POST /bookings/init`, `/addGuests`, `/payments`, `/cancel` |
+| `/bookings` | Guest | `GET /bookings`, `/payments`, `/cancel` |
+| `/admin` | Hotel manager | `/admin/hotels/**` |
+| `/admin/hotels/:id/rooms` | Hotel manager | `/admin/hotels/{id}/rooms/**` |
+| `/login`, `/signup` | Public | `POST /auth/login`, `POST /auth/signup` |
 
-## Setup & Run
-
-### 1. Start the Spring Boot backend
-```bash
-cd airBnbApp
-./mvnw spring-boot:run
-```
-Backend runs on `http://localhost:8080`
-
-### 2. Install frontend dependencies
-```bash
-cd airbnb-frontend
-npm install
-```
-
-### 3. Configure API URL (optional)
-```bash
-cp .env.example .env
-# Edit .env if your backend runs on a different port
-```
-
-### 4. Start the frontend
-```bash
-npm start
-```
-Frontend runs on `http://localhost:3000`
-
-## Pages & Features
-
-### 🏠 Home Page (`/`)
-- Full-screen hero with animated search box
-- Search by city, check-in/out dates, rooms count
-- Quick-select popular cities
-
-### 🔍 Search Results (`/search`)
-- Grid of hotel cards with pricing
-- Filter bar to update search params
-- Pagination support
-
-### 🏨 Hotel Detail (`/hotels/:id`)
-- Hotel hero with amenities
-- Room selection cards with pricing
-- 3-step booking wizard:
-  1. Select room + dates
-  2. Add guest details
-  3. Booking confirmation
-- Live price summary sidebar
-
-### 🔧 Admin Dashboard (`/admin`)
-- Create / Edit / Delete hotels
-- Activate inactive hotels
-- Lookup hotel by ID
-- Navigate to room management
-
-### 🛏️ Room Admin (`/admin/hotels/:id/rooms`)
-- View all rooms for a hotel
-- Create rooms with type, price, capacity, amenities
-- Delete rooms
-
-## CORS Note
-If the backend doesn't have CORS configured, add this to your Spring Boot app:
-
-```java
-@Configuration
-public class CorsConfig implements WebMvcConfigurer {
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-            .allowedOrigins("http://localhost:3000")
-            .allowedMethods("*")
-            .allowedHeaders("*");
-    }
-}
-```
+Dates are always handled as local `YYYY-MM-DD` strings (see `utils/format.js`), never via `toISOString()`, which would shift them to UTC.
