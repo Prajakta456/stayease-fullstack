@@ -47,7 +47,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Same Node/npm as development: npm 10 and 11 disagree on optional entries in package-lock.json
+          node-version-file: airbnb-frontend/.nvmrc
           cache: npm
           cache-dependency-path: airbnb-frontend/package-lock.json
       - run: npm ci

@@ -76,7 +76,7 @@ Then open **http://localhost:3000** and sign in with a [demo account](#demo-acco
 
 ### Prerequisites
 - Java 17 or newer (the Maven wrapper `./mvnw` is included, so Maven itself isn't required)
-- Node.js 18+ and npm
+- Node.js 24 with npm 11 (see `airbnb-frontend/.nvmrc`; the lockfile is written by npm 11)
 - MySQL 8 — installed locally, or run with Docker
 
 ### 1. Database
