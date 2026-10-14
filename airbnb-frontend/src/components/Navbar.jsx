@@ -7,8 +7,8 @@ export default function Navbar() {
   const navigate = useNavigate();
   const { user, logout, isHotelManager } = useAuth();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast.success('Signed out successfully');
     navigate('/');
   };

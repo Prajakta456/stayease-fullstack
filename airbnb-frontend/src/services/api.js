@@ -21,12 +21,32 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// A 401 on an authenticated request means the session expired or was revoked:
+// drop the stored user and let AuthContext send the user back to sign in.
+export const SESSION_EXPIRED_EVENT = 'auth:session-expired';
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/signup', '/auth/logout'];
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const isAuthEndpoint = AUTH_ENDPOINTS.some(path => error.config?.url?.endsWith(path));
+    if (error.response?.status === 401 && !isAuthEndpoint && localStorage.getItem('airbnb_user')) {
+      localStorage.removeItem('airbnb_user');
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ---- Auth ----
 export const signup = (data) =>
   api.post('/auth/signup', data).then(r => r.data?.data || r.data);
 
 export const loginApi = (data) =>
   api.post('/auth/login', data).then(r => r.data?.data || r.data);
+
+// Revokes every token issued to the current user
+export const logoutApi = () => api.post('/auth/logout');
 
 // ---- Hotel Browse (Public) ----
 export const searchHotels = (searchRequest) =>

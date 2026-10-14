@@ -63,7 +63,7 @@ airbnb-fullstack/
 
 **Global Exception Handling** — A centralized `GlobalExceptionHandler` wraps all API responses in a consistent `ApiResponse` envelope, so the frontend always receives predictable JSON regardless of success or error state.
 
-**Spring Security + JWT** — Every protected endpoint is secured via a `TokenAuthFilter` that validates JWTs on each request. Role-based access control separates guest, user, and admin permissions cleanly.
+**Spring Security + JWT** — Signed (HS256), expiring JWTs are validated by `JwtAuthFilter` on every request; logging out revokes all of a user's tokens. Routes are restricted by role (`GUEST` books stays, `HOTEL_MANAGER` manages hotels), and every hotel, room and booking is scoped to its owner. Login and signup are rate-limited per IP and per email.
 
 ---
 
@@ -96,7 +96,15 @@ spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
 spring.jpa.hibernate.ddl-auto=update
 ```
 
-3. Run the backend:
+3. Set a JWT signing secret (at least 32 characters). Without it the backend generates a random key at startup and every restart signs everyone out:
+
+```bash
+export JWT_SECRET="$(openssl rand -base64 48)"
+# optional: token lifetime in minutes (default 60)
+export JWT_EXPIRATION_MINUTES=60
+```
+
+4. Run the backend:
 
 ```bash
 cd airBnbApp
@@ -141,6 +149,7 @@ You can explore all endpoints, view request/response schemas, and test calls dir
 |---|---|---|
 | POST | `/api/v1/auth/signup` | Register a new user |
 | POST | `/api/v1/auth/login` | Login and receive a JWT token |
+| POST | `/api/v1/auth/logout` | Revoke all of the current user's tokens |
 | GET | `/api/v1/hotels` | Browse all hotels |
 | GET | `/api/v1/hotels/search` | Search hotels by date and criteria |
 | GET | `/api/v1/hotels/{id}` | Get hotel details and room info |

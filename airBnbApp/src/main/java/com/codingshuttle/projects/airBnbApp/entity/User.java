@@ -28,4 +28,8 @@ public class User {
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     private Set<Role> roles;
+
+    // Embedded in every JWT; incrementing it (on logout) invalidates all of the user's issued tokens
+    @Column(nullable = false, columnDefinition = "INTEGER DEFAULT 0")
+    private Integer tokenVersion = 0;
 }

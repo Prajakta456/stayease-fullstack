@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import { logoutApi, SESSION_EXPIRED_EVENT } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -19,12 +21,27 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    // Fired by the API client when the backend rejects our token (expired or revoked)
+    const onSessionExpired = () => {
+      setUser(null);
+      toast.error('Your session has expired. Please sign in again.');
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  }, []);
+
   const login = (userData) => {
     setUser(userData);
     localStorage.setItem('airbnb_user', JSON.stringify(userData));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await logoutApi(); // revoke the token server-side
+    } catch {
+      // Already expired/invalid — signing out locally is enough
+    }
     setUser(null);
     localStorage.removeItem('airbnb_user');
   };
