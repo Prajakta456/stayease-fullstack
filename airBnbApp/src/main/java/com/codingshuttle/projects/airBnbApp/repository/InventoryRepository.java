@@ -1,7 +1,5 @@
-
 package com.codingshuttle.projects.airBnbApp.repository;
 
-import com.codingshuttle.projects.airBnbApp.dto.HotelPriceDto;
 import com.codingshuttle.projects.airBnbApp.entity.Hotel;
 import com.codingshuttle.projects.airBnbApp.entity.Inventory;
 import com.codingshuttle.projects.airBnbApp.entity.Room;
@@ -10,9 +8,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -20,21 +20,32 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     void deleteByRoom(Room room);
 
-    // ✅ NEW: search directly from Inventory (not HotelMinPrice which needs cron to populate).
-    // Returns HotelPriceDto with avg nightly price. city='' means all cities.
-    @Query("""
-            SELECT new com.codingshuttle.projects.airBnbApp.dto.HotelPriceDto(i.hotel, CAST(AVG(i.price) AS double))
-            FROM Inventory i
-            WHERE (:city = '' OR i.city = :city)
+    /*
+     * A hotel matches when at least one of its room types has enough free rooms on EVERY
+     * night of the stay. The inner query finds those room types (one row per room with its
+     * average nightly price); the outer query keeps the cheapest one per hotel.
+     * Native SQL because JPQL cannot aggregate over a grouped subquery.
+     */
+    String BOOKABLE_ROOMS_SQL = """
+            SELECT i.hotel_id, i.room_id, AVG(i.price) AS avg_price
+            FROM inventory i
+            JOIN hotel h ON h.id = i.hotel_id
+            WHERE (:city = '' OR LOWER(i.city) = LOWER(:city))
                 AND i.date >= :startDate
                 AND i.date < :endDate
                 AND i.closed = false
-                AND (i.totalCount - i.bookedCount - i.reservedCount) >= :roomsCount
-                AND i.hotel.active = true
-            GROUP BY i.hotel
-            HAVING COUNT(i.date) >= :dateCount
-            """)
-    Page<HotelPriceDto> searchHotelsWithPrice(
+                AND (i.total_count - i.booked_count - i.reserved_count) >= :roomsCount
+                AND h.active = true
+            GROUP BY i.hotel_id, i.room_id
+            HAVING COUNT(*) = :dateCount
+            """;
+
+    @Query(value = "SELECT r.hotel_id AS hotelId, MIN(r.avg_price) AS price FROM ("
+                    + BOOKABLE_ROOMS_SQL
+                    + ") r GROUP BY r.hotel_id ORDER BY price, r.hotel_id",
+            countQuery = "SELECT COUNT(DISTINCT r.hotel_id) FROM (" + BOOKABLE_ROOMS_SQL + ") r",
+            nativeQuery = true)
+    Page<HotelPriceProjection> searchHotelsWithPrice(
             @Param("city") String city,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
@@ -62,7 +73,8 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
             Pageable pageable
             );
 
-    // ✅ FIXED: date < :checkOutDate (not BETWEEN ... checkOutDate) — checkout day is not a stay night
+    // Nights of a stay: check-in date inclusive, check-out date exclusive.
+    // Rows are locked in date order so concurrent bookings never deadlock.
     @Query("""
             SELECT i
             FROM Inventory i
@@ -71,6 +83,7 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
                 AND i.date < :checkOutDate
                 AND i.closed = false
                 AND (i.totalCount - i.bookedCount - i.reservedCount) >= :roomsCount
+            ORDER BY i.date
             """)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Inventory> findAndLockAvailableInventory(
@@ -80,5 +93,27 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
             @Param("roomsCount") Integer roomsCount
     );
 
+    // All nights of an existing booking, regardless of availability (used to release or confirm rooms)
+    @Query("""
+            SELECT i
+            FROM Inventory i
+            WHERE i.room.id = :roomId
+                AND i.date >= :checkInDate
+                AND i.date < :checkOutDate
+            ORDER BY i.date
+            """)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Inventory> findAndLockInventoryForStay(
+            @Param("roomId") Long roomId,
+            @Param("checkInDate") LocalDate checkInDate,
+            @Param("checkOutDate") LocalDate checkOutDate
+    );
+
     List<Inventory> findByHotelAndDateBetween(Hotel hotel, LocalDate startDate, LocalDate endDate);
-}   
+
+    // Touches only the price column, so it can never overwrite booked/reserved counts that a
+    // booking changed after the pricing job read the row
+    @Modifying
+    @Query("UPDATE Inventory i SET i.price = :price WHERE i.id = :id")
+    void updatePrice(@Param("id") Long id, @Param("price") BigDecimal price);
+}
