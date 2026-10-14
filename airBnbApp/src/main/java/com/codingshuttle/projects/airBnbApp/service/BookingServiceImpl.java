@@ -9,8 +9,8 @@ import com.codingshuttle.projects.airBnbApp.exception.ResourceNotFoundException;
 import com.codingshuttle.projects.airBnbApp.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.codingshuttle.projects.airBnbApp.security.SecurityUtils;
 import org.modelmapper.ModelMapper;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +29,6 @@ public class BookingServiceImpl implements BookingService {
     private final HotelRepository hotelRepository;
     private final RoomRepository roomRepository;
     private final InventoryRepository inventoryRepository;
-    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -37,6 +36,9 @@ public class BookingServiceImpl implements BookingService {
         log.info("Initialising booking for hotel: {}, room: {}, dates: {}-{}",
                 bookingRequest.getHotelId(), bookingRequest.getRoomId(),
                 bookingRequest.getCheckInDate(), bookingRequest.getCheckOutDate());
+
+        // Resolve the caller before taking any inventory locks
+        User user = SecurityUtils.getCurrentUser();
 
         Hotel hotel = hotelRepository.findById(bookingRequest.getHotelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with id: " + bookingRequest.getHotelId()));
@@ -78,7 +80,7 @@ public class BookingServiceImpl implements BookingService {
                 .room(room)
                 .checkInDate(bookingRequest.getCheckInDate())
                 .checkOutDate(bookingRequest.getCheckOutDate())
-                .user(getCurrentUser())
+                .user(user)
                 .roomsCount(bookingRequest.getRoomsCount())
                 .amount(totalAmount)
                 .build();
@@ -92,7 +94,9 @@ public class BookingServiceImpl implements BookingService {
     public BookingDto addGuests(Long bookingId, List<GuestDto> guestDtoList) {
         log.info("Adding guests for booking with id: {}", bookingId);
 
-        Booking booking = bookingRepository.findById(bookingId)
+        // Only the user who made the booking may modify it; anyone else gets "not found"
+        User user = SecurityUtils.getCurrentUser();
+        Booking booking = bookingRepository.findByIdAndUserId(bookingId, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
 
         if (hasBookingExpired(booking)) {
@@ -105,7 +109,7 @@ public class BookingServiceImpl implements BookingService {
 
         for (GuestDto guestDto : guestDtoList) {
             Guest guest = modelMapper.map(guestDto, Guest.class);
-            guest.setUser(getCurrentUser());
+            guest.setUser(user);
             guest = guestRepository.save(guest);
             booking.getGuests().add(guest);
         }
@@ -117,13 +121,5 @@ public class BookingServiceImpl implements BookingService {
 
     public boolean hasBookingExpired(Booking booking) {
         return booking.getCreatedAt().plusMinutes(10).isBefore(LocalDateTime.now());
-    }
-
-    // ✅ FIXED: reads actual authenticated user from Spring Security context
-    //    instead of hardcoded dummy user with id=1
-    private User getCurrentUser() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
     }
 }

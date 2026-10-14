@@ -6,6 +6,7 @@ import com.codingshuttle.projects.airBnbApp.entity.Room;
 import com.codingshuttle.projects.airBnbApp.exception.ResourceNotFoundException;
 import com.codingshuttle.projects.airBnbApp.repository.HotelRepository;
 import com.codingshuttle.projects.airBnbApp.repository.RoomRepository;
+import com.codingshuttle.projects.airBnbApp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -28,9 +29,7 @@ public class RoomServiceImpl implements RoomService{
     @Override
     public RoomDto createNewRoom(Long hotelId, RoomDto roomDto) {
         log.info("Creating a new room in hotel with ID: {}", hotelId);
-        Hotel hotel = hotelRepository
-                .findById(hotelId)
-                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: "+hotelId));
+        Hotel hotel = getOwnedHotel(hotelId);
         Room room = modelMapper.map(roomDto, Room.class);
         room.setHotel(hotel);
         room = roomRepository.save(room);
@@ -45,9 +44,7 @@ public class RoomServiceImpl implements RoomService{
     @Override
     public List<RoomDto> getAllRoomsInHotel(Long hotelId) {
         log.info("Getting all rooms in hotel with ID: {}", hotelId);
-        Hotel hotel = hotelRepository
-                .findById(hotelId)
-                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: "+hotelId));
+        Hotel hotel = getOwnedHotel(hotelId);
 
         return hotel.getRooms()
                 .stream()
@@ -56,22 +53,31 @@ public class RoomServiceImpl implements RoomService{
     }
 
     @Override
-    public RoomDto getRoomById(Long roomId) {
+    public RoomDto getRoomById(Long hotelId, Long roomId) {
         log.info("Getting the room with ID: {}", roomId);
-        Room room = roomRepository
-                .findById(roomId)
-                .orElseThrow(() -> new ResourceNotFoundException("Room not found with ID: "+roomId));
-        return modelMapper.map(room, RoomDto.class);
+        return modelMapper.map(getOwnedRoom(hotelId, roomId), RoomDto.class);
     }
 
     @Transactional
     @Override
-    public void deleteRoomById(Long roomId) {
+    public void deleteRoomById(Long hotelId, Long roomId) {
         log.info("Deleting the room with ID: {}", roomId);
-        Room room = roomRepository
-                .findById(roomId)
-                .orElseThrow(() -> new ResourceNotFoundException("Room not found with ID: "+roomId));
+        Room room = getOwnedRoom(hotelId, roomId);
         inventoryService.deleteAllInventories(room);
         roomRepository.deleteById(roomId);
+    }
+
+    // Hotels/rooms of other managers are reported as "not found" so their existence is not revealed
+    private Hotel getOwnedHotel(Long hotelId) {
+        return hotelRepository
+                .findByIdAndOwnerId(hotelId, SecurityUtils.getCurrentUser().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: "+hotelId));
+    }
+
+    private Room getOwnedRoom(Long hotelId, Long roomId) {
+        Hotel hotel = getOwnedHotel(hotelId);
+        return roomRepository
+                .findByIdAndHotelId(roomId, hotel.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found with ID: "+roomId));
     }
 }
