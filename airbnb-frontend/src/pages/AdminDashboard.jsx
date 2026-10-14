@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createHotel, getAllHotels, getHotelById, updateHotel, deleteHotel, activateHotel } from '../services/api';
+import { createHotel, getAllHotels, getHotelById, updateHotel, deleteHotel, activateHotel, deactivateHotel, getErrorMessage } from '../services/api';
 import toast from 'react-hot-toast';
 
 const EMPTY_HOTEL = {
-  name: '', city: '', photos: [], amenities: [], active: false,
+  name: '', city: '', photos: [], amenities: [],
   contactInfo: { phoneNumber: '', email: '', address: '', website: '' }
 };
 
@@ -22,8 +22,9 @@ function HotelFormModal({ hotel, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true);
     try {
+      const { active, ...fields } = form;
       const payload = {
-        ...form,
+        ...fields,
         photos: typeof form.photos === 'string'
           ? form.photos.split('\n').map(s => s.trim()).filter(Boolean)
           : form.photos,
@@ -42,7 +43,7 @@ function HotelFormModal({ hotel, onClose, onSaved }) {
       onSaved(saved);
       onClose();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to save hotel');
+      toast.error(getErrorMessage(e, 'Failed to save hotel'));
     } finally {
       setSaving(false);
     }
@@ -96,18 +97,11 @@ function HotelFormModal({ hotel, onClose, onSaved }) {
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input
-                  type="checkbox"
-                  id="active"
-                  checked={form.active || false}
-                  onChange={e => handleChange('active', e.target.checked)}
-                  style={{ width: 18, height: 18, accentColor: 'var(--clay)' }}
-                />
-                <label htmlFor="active" style={{ fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer' }}>
-                  Mark as Active (visible to guests)
-                </label>
-              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--ink-mid)' }}>
+                {isEdit
+                  ? 'Use Activate / Deactivate in the hotel list to publish or hide this hotel.'
+                  : 'New hotels start inactive. Add rooms, then click Activate to make the hotel bookable.'}
+              </p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 8 }}>
                 <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
                 <button type="submit" className="btn btn-clay" disabled={saving}>
@@ -161,8 +155,8 @@ export default function AdminDashboard() {
       await deleteHotel(hotelId);
       setHotels(prev => prev.filter(h => h.id !== hotelId));
       toast.success('Hotel deleted');
-    } catch {
-      toast.error('Could not delete hotel');
+    } catch (e) {
+      toast.error(getErrorMessage(e, 'Could not delete hotel'));
     } finally {
       setLoadingId(null);
     }
@@ -174,8 +168,22 @@ export default function AdminDashboard() {
       await activateHotel(hotelId);
       setHotels(prev => prev.map(h => h.id === hotelId ? { ...h, active: true } : h));
       toast.success('Hotel activated');
-    } catch {
-      toast.error('Could not activate hotel');
+    } catch (e) {
+      toast.error(getErrorMessage(e, 'Could not activate hotel'));
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const handleDeactivate = async (hotelId) => {
+    if (!window.confirm('Hide this hotel from guests? Existing bookings are kept.')) return;
+    setLoadingId(hotelId);
+    try {
+      await deactivateHotel(hotelId);
+      setHotels(prev => prev.map(h => h.id === hotelId ? { ...h, active: false } : h));
+      toast.success('Hotel deactivated');
+    } catch (e) {
+      toast.error(getErrorMessage(e, 'Could not deactivate hotel'));
     } finally {
       setLoadingId(null);
     }
@@ -284,7 +292,15 @@ export default function AdminDashboard() {
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button className="btn btn-ghost btn-sm" onClick={() => openEdit(hotel)}>Edit</button>
-                            {!hotel.active && (
+                            {hotel.active ? (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                disabled={loadingId === hotel.id}
+                                onClick={() => handleDeactivate(hotel.id)}
+                              >
+                                Deactivate
+                              </button>
+                            ) : (
                               <button
                                 className="btn btn-sm"
                                 style={{ background: 'var(--green)', color: 'white' }}

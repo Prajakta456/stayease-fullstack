@@ -1,16 +1,16 @@
 package com.codingshuttle.projects.airBnbApp.dto;
 
-import com.codingshuttle.projects.airBnbApp.entity.Hotel;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 public class HotelPriceDto {
-    // NOTE: Hotel entity is used here because JPQL constructor expressions require
-    // the exact type. The Hotel entity has @JsonIgnoreProperties on lazy fields.
-    private Hotel hotel;
-    private Double price;
+    private HotelDto hotel;
+    // Average nightly price of the cheapest room type bookable for the whole stay
+    private BigDecimal price;
 }

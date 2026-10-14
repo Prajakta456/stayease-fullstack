@@ -52,8 +52,9 @@ export const logoutApi = () => api.post('/auth/logout');
 export const searchHotels = (searchRequest) =>
   api.post('/hotels/search', searchRequest).then(r => r.data?.data || r.data);
 
-export const getHotelInfo = (hotelId) =>
-  api.get(`/hotels/${hotelId}/info`).then(r => r.data?.data || r.data);
+// With { startDate, endDate, roomsCount }, each room also carries `price` (avg nightly) and `available`
+export const getHotelInfo = (hotelId, stay) =>
+  api.get(`/hotels/${hotelId}/info`, { params: stay }).then(r => r.data?.data || r.data);
 
 // ---- Hotel Admin ----
 export const createHotel = (hotelDto) =>
@@ -74,6 +75,9 @@ export const deleteHotel = (hotelId) =>
 
 export const activateHotel = (hotelId) =>
   api.patch(`/admin/hotels/${hotelId}/activate`).then(r => r.data?.data || r.data);
+
+export const deactivateHotel = (hotelId) =>
+  api.patch(`/admin/hotels/${hotelId}/deactivate`).then(r => r.data?.data || r.data);
 
 // ---- Room Admin ----
 export const createRoom = (hotelId, roomDto) =>

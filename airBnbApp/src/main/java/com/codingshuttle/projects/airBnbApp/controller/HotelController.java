@@ -55,4 +55,11 @@ public class HotelController {
         hotelService.activateHotel(hotelId);
         return ResponseEntity.noContent().build();
     }
+
+    // Hides the hotel from search and stops new bookings; existing bookings are kept
+    @PatchMapping("/{hotelId}/deactivate")
+    public ResponseEntity<Void> deactivateHotel(@PathVariable Long hotelId) {
+        hotelService.deactivateHotel(hotelId);
+        return ResponseEntity.noContent().build();
+    }
 }

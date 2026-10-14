@@ -2,7 +2,6 @@ package com.codingshuttle.projects.airBnbApp.repository;
 
 import com.codingshuttle.projects.airBnbApp.entity.Hotel;
 import com.codingshuttle.projects.airBnbApp.entity.Inventory;
-import com.codingshuttle.projects.airBnbApp.entity.Room;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,9 +17,28 @@ import java.util.List;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
-    void deleteByRoom(Room room);
+    @Modifying
+    @Query("DELETE FROM Inventory i WHERE i.room.id = :roomId")
+    void deleteAllByRoomId(@Param("roomId") Long roomId);
+
+    // Inventory keeps a copy of the city for fast search; keep it in sync when a hotel moves
+    @Modifying
+    @Query("UPDATE Inventory i SET i.city = :city WHERE i.hotel.id = :hotelId")
+    void updateCityForHotel(@Param("hotelId") Long hotelId, @Param("city") String city);
+
+    @Query("SELECT i.date FROM Inventory i WHERE i.room.id = :roomId AND i.date BETWEEN :from AND :to")
+    List<LocalDate> findDatesForRoom(@Param("roomId") Long roomId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("""
+            SELECT i FROM Inventory i
+            WHERE i.hotel.id = :hotelId AND i.date >= :startDate AND i.date < :endDate
+            """)
+    List<Inventory> findForHotelStay(@Param("hotelId") Long hotelId,
+                                     @Param("startDate") LocalDate startDate,
+                                     @Param("endDate") LocalDate endDate);
 
     /*
+     * The search text matches the city exactly or the hotel name partially (case-insensitive).
      * A hotel matches when at least one of its room types has enough free rooms on EVERY
      * night of the stay. The inner query finds those room types (one row per room with its
      * average nightly price); the outer query keeps the cheapest one per hotel.
@@ -30,7 +48,7 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
             SELECT i.hotel_id, i.room_id, AVG(i.price) AS avg_price
             FROM inventory i
             JOIN hotel h ON h.id = i.hotel_id
-            WHERE (:city = '' OR LOWER(i.city) = LOWER(:city))
+            WHERE (:city = '' OR LOWER(i.city) = LOWER(:city) OR LOWER(h.name) LIKE CONCAT('%', LOWER(:city), '%'))
                 AND i.date >= :startDate
                 AND i.date < :endDate
                 AND i.closed = false
@@ -53,25 +71,6 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
             @Param("dateCount") Long dateCount,
             Pageable pageable
     );
-
-    @Query("""
-            SELECT DISTINCT i.hotel
-            FROM Inventory i
-            WHERE i.city = :city
-                AND i.date BETWEEN :startDate AND :endDate
-                AND i.closed = false
-                AND (i.totalCount - i.bookedCount - i.reservedCount) >= :roomsCount
-           GROUP BY i.hotel, i.room
-           HAVING COUNT(i.date) = :dateCount
-           """)
-    Page<Hotel> findHotelsWithAvailableInventory(
-            @Param("city") String city,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
-            @Param("roomsCount") Integer roomsCount,
-            @Param("dateCount") Long dateCount,
-            Pageable pageable
-            );
 
     // Nights of a stay: check-in date inclusive, check-out date exclusive.
     // Rows are locked in date order so concurrent bookings never deadlock.

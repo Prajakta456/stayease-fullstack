@@ -116,10 +116,8 @@ class BookingFlowIntegrationTest extends IntegrationTestSupport {
 
     @Test
     void inactiveHotel_cannotBeBooked() throws Exception {
-        mockMvc.perform(put("/admin/hotels/" + hotelId).header("Authorization", bearer(manager))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Owned Hotel\",\"city\":\"Mumbai\",\"active\":false}"))
-                .andExpect(status().isOk());
+        mockMvc.perform(patch("/admin/hotels/" + hotelId + "/deactivate").header("Authorization", bearer(manager)))
+                .andExpect(status().isNoContent());
 
         initBooking(guest, hotelId, roomId, checkIn, checkOut, 1)
                 .andExpect(status().isConflict())
