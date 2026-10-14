@@ -1,5 +1,7 @@
 package com.codingshuttle.projects.airBnbApp.service;
 
+import com.codingshuttle.projects.airBnbApp.exception.BadRequestException;
+import com.codingshuttle.projects.airBnbApp.exception.ConflictException;
 import com.codingshuttle.projects.airBnbApp.dto.BookingDto;
 import com.codingshuttle.projects.airBnbApp.dto.BookingRequest;
 import com.codingshuttle.projects.airBnbApp.dto.GuestDto;
@@ -69,13 +71,13 @@ public class BookingServiceImpl implements BookingService {
 
         long daysCount = ChronoUnit.DAYS.between(bookingRequest.getCheckInDate(), bookingRequest.getCheckOutDate());
         if (daysCount <= 0) {
-            throw new IllegalArgumentException("Check-out date must be after check-in date");
+            throw new BadRequestException("Check-out date must be after check-in date");
         }
 
         Hotel hotel = hotelRepository.findById(bookingRequest.getHotelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with id: " + bookingRequest.getHotelId()));
         if (!Boolean.TRUE.equals(hotel.getActive())) {
-            throw new IllegalStateException("This hotel is not accepting bookings");
+            throw new ConflictException("This hotel is not accepting bookings");
         }
 
         // The room must belong to the hotel being booked
@@ -89,7 +91,7 @@ public class BookingServiceImpl implements BookingService {
                 bookingRequest.getRoomsCount());
 
         if (inventoryList.size() != daysCount) {
-            throw new IllegalStateException("Room is not available for the selected dates");
+            throw new ConflictException("Room is not available for the selected dates");
         }
 
         for (Inventory inventory : inventoryList) {
@@ -126,13 +128,13 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = getOwnBookingForUpdate(bookingId, user);
 
         if (booking.getBookingStatus() != BookingStatus.RESERVED) {
-            throw new IllegalStateException("Guests can only be added to a reserved booking");
+            throw new ConflictException("Guests can only be added to a reserved booking");
         }
         requireHoldActive(booking);
 
         int maxGuests = booking.getRoom().getCapacity() * booking.getRoomsCount();
         if (guestDtoList.size() > maxGuests) {
-            throw new IllegalArgumentException("This booking allows at most " + maxGuests + " guests");
+            throw new BadRequestException("This booking allows at most " + maxGuests + " guests");
         }
 
         for (GuestDto guestDto : guestDtoList) {
@@ -156,7 +158,7 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = getOwnBookingForUpdate(bookingId, SecurityUtils.getCurrentUser());
 
         if (booking.getBookingStatus() != BookingStatus.GUESTS_ADDED) {
-            throw new IllegalStateException(booking.getBookingStatus() == BookingStatus.RESERVED
+            throw new ConflictException(booking.getBookingStatus() == BookingStatus.RESERVED
                     ? "Add guest details before paying"
                     : "This booking cannot be paid for");
         }
@@ -191,10 +193,10 @@ public class BookingServiceImpl implements BookingService {
         BookingStatus status = booking.getBookingStatus();
 
         if (status == BookingStatus.CANCELLED || status == BookingStatus.EXPIRED) {
-            throw new IllegalStateException("This booking is already " + status.name().toLowerCase());
+            throw new ConflictException("This booking is already " + status.name().toLowerCase());
         }
         if (!booking.getCheckInDate().isAfter(LocalDate.now())) {
-            throw new IllegalStateException("Bookings can only be cancelled before the check-in date");
+            throw new ConflictException("Bookings can only be cancelled before the check-in date");
         }
 
         if (status == BookingStatus.CONFIRMED) {
@@ -256,7 +258,7 @@ public class BookingServiceImpl implements BookingService {
 
     private void requireHoldActive(Booking booking) {
         if (hasHoldElapsed(booking)) {
-            throw new IllegalStateException("Your reservation hold has expired, please book again");
+            throw new ConflictException("Your reservation hold has expired, please book again");
         }
     }
 

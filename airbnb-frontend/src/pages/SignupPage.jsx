@@ -25,8 +25,9 @@ export default function SignupPage() {
       toast.error('Passwords do not match');
       return;
     }
-    if (form.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    // Same rule as the backend (bcrypt only uses the first 72 bytes)
+    if (form.password.length < 8 || form.password.length > 72) {
+      toast.error('Password must be between 8 and 72 characters');
       return;
     }
     setLoading(true);
@@ -115,7 +116,9 @@ export default function SignupPage() {
               className="form-input"
               type="password"
               name="password"
-              placeholder="Min. 6 characters"
+              placeholder="At least 8 characters"
+              minLength={8}
+              maxLength={72}
               value={form.password}
               onChange={handleChange}
               required

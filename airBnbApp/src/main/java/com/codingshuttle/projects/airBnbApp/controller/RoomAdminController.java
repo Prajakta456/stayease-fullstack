@@ -2,6 +2,9 @@ package com.codingshuttle.projects.airBnbApp.controller;
 
 import com.codingshuttle.projects.airBnbApp.dto.RoomDto;
 import com.codingshuttle.projects.airBnbApp.service.RoomService;
+import com.codingshuttle.projects.airBnbApp.dto.OnCreate;
+import jakarta.validation.groups.Default;
+import org.springframework.validation.annotation.Validated;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +21,7 @@ public class RoomAdminController {
 
     @PostMapping
     public ResponseEntity<RoomDto> createNewRoom(@PathVariable Long hotelId,
-                                                 @RequestBody RoomDto roomDto) {
+                                                 @RequestBody @Validated({OnCreate.class, Default.class}) RoomDto roomDto) {
         RoomDto room = roomService.createNewRoom(hotelId, roomDto);
         return new ResponseEntity<>(room, HttpStatus.CREATED);
     }

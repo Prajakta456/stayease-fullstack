@@ -12,6 +12,7 @@ import com.codingshuttle.projects.airBnbApp.repository.HotelPriceProjection;
 import com.codingshuttle.projects.airBnbApp.repository.HotelRepository;
 import com.codingshuttle.projects.airBnbApp.repository.InventoryRepository;
 import com.codingshuttle.projects.airBnbApp.repository.RoomRepository;
+import com.codingshuttle.projects.airBnbApp.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -107,6 +108,9 @@ public class InventoryServiceImpl implements InventoryService {
         long dateCount = ChronoUnit.DAYS.between(
                 hotelSearchRequest.getStartDate(),
                 hotelSearchRequest.getEndDate());
+        if (dateCount <= 0) {
+            throw new BadRequestException("End date must be after start date");
+        }
 
         // Null/blank means "anywhere"; otherwise matches a city or part of a hotel name
         String city = (hotelSearchRequest.getCity() == null) ? "" : hotelSearchRequest.getCity().trim();

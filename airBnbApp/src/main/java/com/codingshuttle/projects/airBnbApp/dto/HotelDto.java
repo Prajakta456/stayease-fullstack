@@ -1,6 +1,9 @@
 package com.codingshuttle.projects.airBnbApp.dto;
 
 import com.codingshuttle.projects.airBnbApp.entity.HotelContactInfo;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.List;
@@ -8,11 +11,25 @@ import java.util.List;
 @Data
 public class HotelDto {
     private Long id;
+
+    // Required on create; on update, omitted fields keep their current value
+    @NotBlank(groups = OnCreate.class)
+    @Size(min = 1, max = 200)
     private String name;
+
+    @NotBlank(groups = OnCreate.class)
+    @Size(min = 1, max = 100)
     private String city;
-    // ✅ FIXED: was String[] — entity uses List<String>, must match to avoid ModelMapper mismatch
-    private List<String> photos;
-    private List<String> amenities;
+
+    @Size(max = 20)
+    private List<@NotBlank @Size(max = 255) String> photos;
+
+    @Size(max = 30)
+    private List<@NotBlank @Size(max = 100) String> amenities;
+
+    @Valid
     private HotelContactInfo contactInfo;
+
+    // Read-only: publishing is done with PATCH /admin/hotels/{id}/activate and /deactivate
     private Boolean active;
 }

@@ -5,6 +5,7 @@ import com.codingshuttle.projects.airBnbApp.dto.HotelPriceDto;
 import com.codingshuttle.projects.airBnbApp.dto.HotelSearchRequest;
 import com.codingshuttle.projects.airBnbApp.service.HotelService;
 import com.codingshuttle.projects.airBnbApp.service.InventoryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -22,7 +23,7 @@ public class HotelBrowseController {
     private final HotelService hotelService;
 
     @PostMapping("/search")
-    public ResponseEntity<Page<HotelPriceDto>> searchHotels(@RequestBody HotelSearchRequest hotelSearchRequest) {
+    public ResponseEntity<Page<HotelPriceDto>> searchHotels(@RequestBody @Valid HotelSearchRequest hotelSearchRequest) {
         var page = inventoryService.searchHotels(hotelSearchRequest);
         return ResponseEntity.ok(page);
     }

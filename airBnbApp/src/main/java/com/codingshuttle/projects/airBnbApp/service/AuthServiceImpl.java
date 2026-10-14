@@ -1,5 +1,7 @@
 package com.codingshuttle.projects.airBnbApp.service;
 
+import com.codingshuttle.projects.airBnbApp.exception.BadRequestException;
+import com.codingshuttle.projects.airBnbApp.exception.ConflictException;
 import com.codingshuttle.projects.airBnbApp.dto.AuthResponse;
 import com.codingshuttle.projects.airBnbApp.dto.LoginRequest;
 import com.codingshuttle.projects.airBnbApp.dto.SignupRequest;
@@ -7,6 +9,8 @@ import com.codingshuttle.projects.airBnbApp.entity.User;
 import com.codingshuttle.projects.airBnbApp.entity.enums.Role;
 import com.codingshuttle.projects.airBnbApp.repository.UserRepository;
 import com.codingshuttle.projects.airBnbApp.security.JwtService;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,6 +32,9 @@ public class AuthServiceImpl implements AuthService {
      */
     private static final Set<Role> SELF_ASSIGNABLE_ROLES = Set.of(Role.GUEST, Role.HOTEL_MANAGER);
 
+    // bcrypt ignores everything after the first 72 bytes of a password
+    private static final int MAX_PASSWORD_BYTES = 72;
+
     private static final String INVALID_CREDENTIALS = "Invalid email or password";
     private static final String EMAIL_TAKEN = "An account with this email already exists";
 
@@ -43,15 +50,19 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponse signup(SignupRequest request) {
         Role role = (request.getRole() != null) ? request.getRole() : Role.GUEST;
         if (!SELF_ASSIGNABLE_ROLES.contains(role)) {
-            throw new IllegalArgumentException("This role cannot be selected at signup");
+            throw new BadRequestException("This role cannot be selected at signup");
         }
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalStateException(EMAIL_TAKEN);
+        String email = normalizeEmail(request.getEmail());
+        if (request.getPassword().getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) {
+            throw new BadRequestException("Password is too long");
+        }
+        if (userRepository.existsByEmail(email)) {
+            throw new ConflictException(EMAIL_TAKEN);
         }
 
         User user = new User();
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRoles(Set.of(role));
 
@@ -60,7 +71,7 @@ public class AuthServiceImpl implements AuthService {
             saved = userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
             // Another signup with the same email won the race past the existsByEmail check
-            throw new IllegalStateException(EMAIL_TAKEN);
+            throw new ConflictException(EMAIL_TAKEN);
         }
         log.info("New user registered with id: {}", saved.getId());
         return toAuthResponse(saved);
@@ -68,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        User user = userRepository.findByEmail(normalizeEmail(request.getEmail())).orElse(null);
         if (user == null) {
             passwordEncoder.matches(String.valueOf(request.getPassword()), getDummyPasswordHash());
             throw new BadCredentialsException(INVALID_CREDENTIALS);
@@ -86,6 +97,11 @@ public class AuthServiceImpl implements AuthService {
         // Bumping the version revokes every token issued to this user so far
         userRepository.findById(user.getId()).ifPresent(u -> u.setTokenVersion(u.getTokenVersion() + 1));
         log.info("User {} logged out", user.getId());
+    }
+
+    // Emails are stored lowercase so "Asha@x.com" and "asha@x.com" are the same account
+    private static String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private AuthResponse toAuthResponse(User user) {

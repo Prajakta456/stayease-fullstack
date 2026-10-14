@@ -2,6 +2,10 @@ package com.codingshuttle.projects.airBnbApp.controller;
 
 import com.codingshuttle.projects.airBnbApp.dto.HotelDto;
 import com.codingshuttle.projects.airBnbApp.service.HotelService;
+import com.codingshuttle.projects.airBnbApp.dto.OnCreate;
+import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
+import org.springframework.validation.annotation.Validated;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -19,8 +23,8 @@ public class HotelController {
     private final HotelService hotelService;
 
     @PostMapping
-    public ResponseEntity<HotelDto> createNewHotel(@RequestBody HotelDto hotelDto) {
-        log.info("Attempting to create a new hotel with name: " + hotelDto.getName());
+    public ResponseEntity<HotelDto> createNewHotel(@RequestBody @Validated({OnCreate.class, Default.class}) HotelDto hotelDto) {
+        log.info("Attempting to create a new hotel with name: {}", hotelDto.getName());
         HotelDto hotel = hotelService.createNewHotel(hotelDto);
         return new ResponseEntity<>(hotel, HttpStatus.CREATED);
     }
@@ -39,7 +43,7 @@ public class HotelController {
     }
 
     @PutMapping("/{hotelId}")
-    public ResponseEntity<HotelDto> updateHotelById(@PathVariable Long hotelId, @RequestBody HotelDto hotelDto) {
+    public ResponseEntity<HotelDto> updateHotelById(@PathVariable Long hotelId, @RequestBody @Valid HotelDto hotelDto) {
         HotelDto hotel = hotelService.updateHotelById(hotelId, hotelDto);
         return ResponseEntity.ok(hotel);
     }
