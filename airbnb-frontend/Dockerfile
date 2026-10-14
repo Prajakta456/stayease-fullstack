@@ -21,5 +21,6 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/build /usr/share/nginx/html
 
 EXPOSE 8080
+# 127.0.0.1 rather than localhost, which resolves to IPv6 (::1) first in Alpine
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
-    CMD wget -q -O /dev/null http://localhost:8080/ || exit 1
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
