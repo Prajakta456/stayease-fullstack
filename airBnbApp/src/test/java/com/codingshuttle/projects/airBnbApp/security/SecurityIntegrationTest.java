@@ -1,24 +1,18 @@
 package com.codingshuttle.projects.airBnbApp.security;
 
+import com.codingshuttle.projects.airBnbApp.IntegrationTestSupport;
 import com.codingshuttle.projects.airBnbApp.advice.GlobalExceptionHandler;
 import com.codingshuttle.projects.airBnbApp.entity.User;
 import com.codingshuttle.projects.airBnbApp.repository.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Base64;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -26,12 +20,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-class SecurityIntegrationTest {
-
-    @Autowired
-    private MockMvc mockMvc;
+class SecurityIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     private JwtService jwtService;
@@ -157,7 +146,7 @@ class SecurityIntegrationTest {
                 .content("{\"name\":\"Hijacked\",\"city\":\"Goa\",\"active\":false}")).andExpect(status().isNotFound());
         mockMvc.perform(patch(path + "/activate").header("Authorization", bearer(other))).andExpect(status().isNotFound());
         mockMvc.perform(post(path + "/rooms").header("Authorization", bearer(other)).contentType(MediaType.APPLICATION_JSON)
-                .content(roomJson())).andExpect(status().isNotFound());
+                .content("{\"type\":\"Deluxe\",\"basePrice\":1000,\"totalCount\":2,\"capacity\":2}")).andExpect(status().isNotFound());
         mockMvc.perform(delete(path).header("Authorization", bearer(other))).andExpect(status().isNotFound());
 
         // still intact for the real owner
@@ -286,67 +275,5 @@ class SecurityIntegrationTest {
         mockMvc.perform(withIp(post("/auth/login"), ip).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + uniqueEmail() + "\",\"password\":\"x\"}"))
                 .andExpect(status().isTooManyRequests());
-    }
-
-    // ---------- helpers ----------
-
-    private String signup(String role) throws Exception {
-        return signup(role, uniqueEmail());
-    }
-
-    private String signup(String role, String email) throws Exception {
-        String response = mockMvc.perform(withIp(post("/auth/signup")).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Test\",\"email\":\"" + email + "\",\"password\":\"pw123456\",\"role\":\"" + role + "\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(response, "$.data.token");
-    }
-
-    private long createHotel(String managerToken) throws Exception {
-        String response = mockMvc.perform(post("/admin/hotels").header("Authorization", bearer(managerToken))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Owned Hotel\",\"city\":\"Mumbai\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return ((Number) JsonPath.read(response, "$.data.id")).longValue();
-    }
-
-    private long createRoom(String managerToken, long hotelId) throws Exception {
-        String response = mockMvc.perform(post("/admin/hotels/" + hotelId + "/rooms")
-                        .header("Authorization", bearer(managerToken))
-                        .contentType(MediaType.APPLICATION_JSON).content(roomJson()))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return ((Number) JsonPath.read(response, "$.data.id")).longValue();
-    }
-
-    private static String roomJson() {
-        return "{\"type\":\"Deluxe\",\"basePrice\":1000,\"totalCount\":2,\"capacity\":2}";
-    }
-
-    private static String bearer(String token) {
-        return "Bearer " + token;
-    }
-
-    private static String uniqueEmail() {
-        return "user-" + UUID.randomUUID() + "@test.local";
-    }
-
-    /** A fresh client IP per request keeps the per-IP rate limits from leaking between tests. */
-    private static MockHttpServletRequestBuilder withIp(MockHttpServletRequestBuilder builder) {
-        return withIp(builder, randomIp());
-    }
-
-    private static MockHttpServletRequestBuilder withIp(MockHttpServletRequestBuilder builder, String ip) {
-        RequestPostProcessor remoteAddr = request -> {
-            request.setRemoteAddr(ip);
-            return request;
-        };
-        return builder.with(remoteAddr);
-    }
-
-    private static String randomIp() {
-        ThreadLocalRandom r = ThreadLocalRandom.current();
-        return "10." + r.nextInt(256) + "." + r.nextInt(256) + "." + r.nextInt(1, 255);
     }
 }

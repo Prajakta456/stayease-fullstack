@@ -2,9 +2,12 @@ package com.codingshuttle.projects.airBnbApp.service;
 
 import com.codingshuttle.projects.airBnbApp.dto.HotelPriceDto;
 import com.codingshuttle.projects.airBnbApp.dto.HotelSearchRequest;
+import com.codingshuttle.projects.airBnbApp.entity.Hotel;
 import com.codingshuttle.projects.airBnbApp.entity.Inventory;
 import com.codingshuttle.projects.airBnbApp.entity.Room;
 import com.codingshuttle.projects.airBnbApp.repository.HotelMinPriceRepository;
+import com.codingshuttle.projects.airBnbApp.repository.HotelPriceProjection;
+import com.codingshuttle.projects.airBnbApp.repository.HotelRepository;
 import com.codingshuttle.projects.airBnbApp.repository.InventoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,8 +18,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +32,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final ModelMapper modelMapper;
     private final InventoryRepository inventoryRepository;
     private final HotelMinPriceRepository hotelMinPriceRepository;
+    private final HotelRepository hotelRepository;
 
     @Override
     public void initializeRoomForAYear(Room room) {
@@ -67,18 +75,27 @@ public class InventoryServiceImpl implements InventoryService {
                 hotelSearchRequest.getStartDate(),
                 hotelSearchRequest.getEndDate());
 
-        // ✅ FIXED: treat null/blank city as "all cities" — query uses (:city = '' OR i.city = :city)
+        // Null/blank city means "all cities"
         String city = (hotelSearchRequest.getCity() == null) ? "" : hotelSearchRequest.getCity().trim();
 
-        // ✅ FIXED: query Inventory directly instead of HotelMinPrice
-        // HotelMinPrice only gets populated by the hourly cron — newly created hotels
-        // would never appear in search until the scheduler fires
-        return inventoryRepository.searchHotelsWithPrice(
+        // Queried from Inventory directly (not the cron-maintained HotelMinPrice table),
+        // so newly activated hotels show up immediately
+        Page<HotelPriceProjection> matches = inventoryRepository.searchHotelsWithPrice(
                 city,
                 hotelSearchRequest.getStartDate(),
                 hotelSearchRequest.getEndDate(),
                 hotelSearchRequest.getRoomsCount(),
                 dateCount,
                 pageable);
+
+        Map<Long, Hotel> hotelsById = hotelRepository
+                .findAllById(matches.map(HotelPriceProjection::getHotelId).getContent())
+                .stream()
+                .collect(Collectors.toMap(Hotel::getId, Function.identity()));
+
+        // Keep the query's cheapest-first order
+        return matches.map(match -> new HotelPriceDto(
+                hotelsById.get(match.getHotelId()),
+                match.getPrice().setScale(2, RoundingMode.HALF_UP).doubleValue()));
     }
 }

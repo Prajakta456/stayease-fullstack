@@ -89,10 +89,23 @@ export const deleteRoom = (hotelId, roomId) =>
   api.delete(`/admin/hotels/${hotelId}/rooms/${roomId}`).then(r => r.data?.data || r.data);
 
 // ---- Bookings ----
+export const getMyBookings = () =>
+  api.get('/bookings').then(r => r.data?.data || r.data);
+
 export const initialiseBooking = (bookingRequest) =>
   api.post('/bookings/init', bookingRequest).then(r => r.data?.data || r.data);
 
 export const addGuests = (bookingId, guests) =>
   api.post(`/bookings/${bookingId}/addGuests`, guests).then(r => r.data?.data || r.data);
+
+export const payForBooking = (bookingId) =>
+  api.post(`/bookings/${bookingId}/payments`).then(r => r.data?.data || r.data);
+
+export const cancelBooking = (bookingId) =>
+  api.post(`/bookings/${bookingId}/cancel`).then(r => r.data?.data || r.data);
+
+// The backend wraps errors as { error: { message, subErrors } }
+export const getErrorMessage = (err, fallback) =>
+  err?.response?.data?.error?.message || fallback;
 
 export default api;

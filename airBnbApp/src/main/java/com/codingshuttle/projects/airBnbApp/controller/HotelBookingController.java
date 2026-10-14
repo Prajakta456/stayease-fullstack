@@ -4,7 +4,8 @@ import com.codingshuttle.projects.airBnbApp.dto.BookingDto;
 import com.codingshuttle.projects.airBnbApp.dto.BookingRequest;
 import com.codingshuttle.projects.airBnbApp.dto.GuestDto;
 import com.codingshuttle.projects.airBnbApp.service.BookingService;
-import lombok.AllArgsConstructor;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,15 +19,31 @@ public class HotelBookingController {
 
     private final BookingService bookingService;
 
+    @GetMapping
+    public ResponseEntity<List<BookingDto>> getMyBookings() {
+        return ResponseEntity.ok(bookingService.getMyBookings());
+    }
+
     @PostMapping("/init")
-    public ResponseEntity<BookingDto> initialiseBooking(@RequestBody BookingRequest bookingRequest) {
+    public ResponseEntity<BookingDto> initialiseBooking(@RequestBody @Valid BookingRequest bookingRequest) {
         return ResponseEntity.ok(bookingService.initialiseBooking(bookingRequest));
     }
 
     @PostMapping("/{bookingId}/addGuests")
     public ResponseEntity<BookingDto> addGuests(@PathVariable Long bookingId,
-                                                @RequestBody List<GuestDto> guestDtoList) {
+                                                @RequestBody @NotEmpty(message = "at least one guest is required")
+                                                List<@Valid GuestDto> guestDtoList) {
         return ResponseEntity.ok(bookingService.addGuests(bookingId, guestDtoList));
     }
 
+    // Charges the guest through the configured PaymentGateway (a mock by default) and confirms the booking
+    @PostMapping("/{bookingId}/payments")
+    public ResponseEntity<BookingDto> payForBooking(@PathVariable Long bookingId) {
+        return ResponseEntity.ok(bookingService.payForBooking(bookingId));
+    }
+
+    @PostMapping("/{bookingId}/cancel")
+    public ResponseEntity<BookingDto> cancelBooking(@PathVariable Long bookingId) {
+        return ResponseEntity.ok(bookingService.cancelBooking(bookingId));
+    }
 }

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { getHotelInfo, initialiseBooking, addGuests } from '../services/api';
+import { getHotelInfo, initialiseBooking, addGuests, payForBooking, cancelBooking, getErrorMessage } from '../services/api';
 import toast from 'react-hot-toast';
 
-const STEP_LABELS = ['Select Room', 'Guest Details', 'Confirm'];
+const STEP_LABELS = ['Select Room', 'Guest Details', 'Payment', 'Confirmed'];
+
+const formatINR = (amount) => `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+const formatTime = (iso) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
 function StepIndicator({ current }) {
   return (
@@ -117,23 +120,53 @@ export default function HotelDetail() {
       setBooking(b);
       setStep(1);
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Booking failed. Try again.');
+      toast.error(getErrorMessage(e, 'Booking failed. Try again.'));
     } finally {
       setSubmitting(false);
     }
   };
 
+  const maxGuests = selectedRoom ? selectedRoom.capacity * roomsCount : 1;
+
   const handleAddGuests = async () => {
     const valid = guests.every(g => g.name && g.age > 0);
     if (!valid) return toast.error('Please fill all guest details');
+    if (guests.length > maxGuests) return toast.error(`This booking allows at most ${maxGuests} guests`);
     setSubmitting(true);
     try {
       const updated = await addGuests(booking.id, guests);
       setBooking(updated);
       setStep(2);
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Could not add guests');
+      toast.error(getErrorMessage(e, 'Could not add guests'));
     } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePay = async () => {
+    setSubmitting(true);
+    try {
+      const confirmed = await payForBooking(booking.id);
+      setBooking(confirmed);
+      setStep(3);
+    } catch (e) {
+      toast.error(getErrorMessage(e, 'Payment failed. Try again.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Going back to change room/dates releases the current hold instead of leaving it reserved
+  const handleChangeSelection = async () => {
+    setSubmitting(true);
+    try {
+      await cancelBooking(booking.id);
+    } catch {
+      // Already expired or cancelled — nothing is held any more
+    } finally {
+      setBooking(null);
+      setStep(0);
       setSubmitting(false);
     }
   };
@@ -302,14 +335,15 @@ export default function HotelDetail() {
                   <div className="card-body">
                     <p style={{ color: 'var(--green)', fontWeight: 600, marginBottom: 4 }}>✓ Room Reserved</p>
                     <p style={{ color: 'var(--ink-mid)', fontSize: '0.88rem' }}>
-                      Booking #{booking?.id} — {booking?.bookingStatus}
+                      Booking #{booking?.id} — held for you until {booking?.holdExpiresAt ? formatTime(booking.holdExpiresAt) : 'soon'}.
+                      Complete payment before then to confirm it.
                     </p>
                   </div>
                 </div>
 
                 <h2 className="section-title" style={{ marginBottom: 8 }}>Guest Information</h2>
                 <p style={{ color: 'var(--ink-mid)', fontSize: '0.88rem', marginBottom: 24 }}>
-                  Add details for all guests staying in this booking.
+                  Add details for all guests staying in this booking (up to {maxGuests}).
                 </p>
 
                 {guests.map((guest, i) => (
@@ -329,12 +363,16 @@ export default function HotelDetail() {
                   </div>
                 ))}
 
-                <button className="btn btn-ghost" onClick={addGuestSlot} style={{ marginBottom: 20 }}>
-                  + Add Guest
-                </button>
+                {guests.length < maxGuests && (
+                  <button className="btn btn-ghost" onClick={addGuestSlot} style={{ marginBottom: 20 }}>
+                    + Add Guest
+                  </button>
+                )}
 
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <button className="btn btn-outline" onClick={() => setStep(0)}>← Back</button>
+                  <button className="btn btn-outline" onClick={handleChangeSelection} disabled={submitting}>
+                    ← Change room or dates
+                  </button>
                   <button
                     className="btn btn-clay"
                     style={{ flex: 1 }}
@@ -347,15 +385,61 @@ export default function HotelDetail() {
               </div>
             )}
 
-            {/* Step 2: Confirmation */}
-            {step === 2 && (
+            {/* Step 2: Payment */}
+            {step === 2 && booking && (
+              <div>
+                <div className="card" style={{ marginBottom: 20 }}>
+                  <div className="card-body">
+                    <h2 className="section-title" style={{ marginBottom: 8 }}>Review & Pay</h2>
+                    <p style={{ color: 'var(--ink-mid)', fontSize: '0.88rem', marginBottom: 20 }}>
+                      Your rooms are held until {booking.holdExpiresAt ? formatTime(booking.holdExpiresAt) : 'soon'}.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {[
+                        ['Room', `${booking.roomType} × ${booking.roomsCount}`],
+                        ['Check-in', booking.checkInDate],
+                        ['Check-out', booking.checkOutDate],
+                        ['Guests', booking.guests?.length || 0],
+                      ].map(([label, val]) => (
+                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                          <span style={{ color: 'var(--ink-mid)' }}>{label}</span>
+                          <span style={{ fontWeight: 600 }}>{val}</span>
+                        </div>
+                      ))}
+                      <div style={{ height: 1, background: 'var(--ash-dark)' }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 700 }}>Total to pay</span>
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--clay-dark)' }}>
+                          {formatINR(booking.amount)}
+                        </span>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--ink-mid)', marginTop: 16 }}>
+                      Demo mode: payments use a mock gateway and no money is charged.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button className="btn btn-outline" onClick={handleChangeSelection} disabled={submitting}>
+                    ← Change room or dates
+                  </button>
+                  <button className="btn btn-clay" style={{ flex: 1 }} onClick={handlePay} disabled={submitting}>
+                    {submitting ? 'Processing...' : `Pay ${formatINR(booking.amount)} →`}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Confirmation */}
+            {step === 3 && (
               <div style={{ textAlign: 'center', padding: '40px 0' }}>
                 <div style={{ fontSize: '4rem', marginBottom: 20 }}>🎉</div>
                 <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, marginBottom: 12 }}>
                   Booking Confirmed!
                 </h2>
                 <p style={{ color: 'var(--ink-mid)', marginBottom: 32 }}>
-                  Your stay at <strong>{hotel.name}</strong> has been successfully reserved.
+                  Your stay at <strong>{hotel.name}</strong> is booked and paid.
                 </p>
 
                 {booking && (
@@ -370,6 +454,7 @@ export default function HotelDetail() {
                           ['Check-out', booking.checkOutDate],
                           ['Rooms', booking.roomsCount],
                           ['Guests', booking.guests?.length || 0],
+                          ['Amount paid', formatINR(booking.amount)],
                         ].map(([label, val]) => (
                           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
                             <span style={{ color: 'var(--ink-mid)' }}>{label}</span>
@@ -390,7 +475,7 @@ export default function HotelDetail() {
           </div>
 
           {/* Right: Price summary sidebar */}
-          {step < 2 && (
+          {step < 3 && (
             <div style={{ position: 'sticky', top: 88 }}>
               <div className="card">
                 <div className="card-body">
@@ -419,14 +504,16 @@ export default function HotelDetail() {
                         </div>
                         <div style={{ height: 1, background: 'var(--ash-dark)' }} />
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontWeight: 700 }}>Total</span>
+                          <span style={{ fontWeight: 700 }}>{booking ? 'Total' : 'Estimated total'}</span>
                           <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--clay-dark)' }}>
-                            ₹{(Number(selectedRoom.basePrice) * nights * roomsCount).toLocaleString('en-IN')}
+                            {formatINR(booking ? booking.amount : Number(selectedRoom.basePrice) * nights * roomsCount)}
                           </span>
                         </div>
                       </div>
                       <p style={{ fontSize: '0.75rem', color: 'var(--ink-mid)', textAlign: 'center' }}>
-                        Taxes & fees may apply at checkout
+                        {booking
+                          ? 'Final price for your dates, including demand-based pricing'
+                          : 'Nightly prices vary with demand; your exact total is shown once the room is reserved'}
                       </p>
                     </>
                   ) : (
