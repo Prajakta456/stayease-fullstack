@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.0</version>
+		<version>3.5.14</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.stayease</groupId>
@@ -29,7 +29,6 @@
 	<properties>
 		<java.version>17</java.version>
 		<jjwt.version>0.12.6</jjwt.version>
-		<!-- Newer than Spring Boot 3.4.0's default (1.18.36), which cannot compile on JDK 25 -->
 		<lombok.version>1.18.42</lombok.version>
 	</properties>
 	<dependencies>
